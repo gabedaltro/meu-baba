@@ -1,23 +1,20 @@
-import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
-import CalendarMonthOutlinedIcon from "@mui/icons-material/CalendarMonthOutlined";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
-import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
+import ContentPasteOutlinedIcon from "@mui/icons-material/ContentPasteOutlined";
 import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
-import SportsHandballOutlinedIcon from "@mui/icons-material/SportsHandballOutlined";
+import SportsSoccerOutlinedIcon from "@mui/icons-material/SportsSoccerOutlined";
 import {
   Alert,
+  Avatar,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
   Grid,
+  Paper,
   Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
+import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { DrawConfigCard } from "../features/teamDraw/components/DrawConfigCard";
 import {
@@ -27,12 +24,10 @@ import {
 import { DrawResultCard } from "../features/teamDraw/components/DrawResultCard";
 import { ParticipantsGridCard } from "../features/teamDraw/components/ParticipantsGridCard";
 import type {
-  DrawMode,
   DrawParticipant,
   DrawParticipantType,
   DrawTeam,
 } from "../features/teamDraw/types";
-import { EventMetricCard } from "../features/nextEvent/components/EventMetricCard";
 
 const todayEventDate = new Date();
 todayEventDate.setHours(21, 30, 0, 0);
@@ -148,22 +143,10 @@ export function TeamDrawPage() {
   const [maxPlayersPerTeam, setMaxPlayersPerTeam] = useState(
     storedDrawState.maxPlayersPerTeam,
   );
-  const [drawMode, setDrawMode] = useState<DrawMode>("random");
   const [teams, setTeams] = useState<DrawTeam[]>(storedDrawState.teams);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
-
-  const eventDate = new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(eventMock.startsAt);
-
-  const eventTime = new Intl.DateTimeFormat("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(eventMock.startsAt);
 
   const summary = useMemo(() => {
     const goalkeeperCount = participants.filter(
@@ -327,114 +310,97 @@ export function TeamDrawPage() {
   };
 
   return (
-    <Stack spacing={{ xs: 2, md: 3 }} sx={{ pb: { xs: 10, lg: 0 } }}>
-      <Stack spacing={0.5}>
-        <Typography variant="h1">Sorteio dos times</Typography>
-        <Typography color="text.secondary">
-          Monte os times rapidamente e copie o resultado para enviar no
-          WhatsApp.
-        </Typography>
-      </Stack>
+    <Stack spacing={{ xs: 2.5, md: 4 }} sx={{ pb: { xs: 11, lg: 2 } }}>
+      <Paper
+        component={motion.header}
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        variant="outlined"
+        sx={{
+          position: "relative",
+          overflow: "hidden",
+          bgcolor: "#155b39",
+          color: "#fff",
+          borderColor: "rgba(255,255,255,0.18)",
+          p: { xs: 2, sm: 3 },
+          boxShadow: "0 20px 60px rgba(16, 70, 43, 0.22)",
+          "&::after": {
+            content: '""',
+            position: "absolute",
+            width: 150,
+            height: 150,
+            border: "2px solid rgba(255,255,255,0.12)",
+            borderRadius: "50%",
+            right: -45,
+            top: "50%",
+            transform: "translateY(-50%)",
+          },
+        }}
+      >
+        <Stack direction="row" spacing={2} sx={{ alignItems: "center", position: "relative", zIndex: 1 }}>
+          <Avatar sx={{ width: { xs: 48, sm: 58 }, height: { xs: 48, sm: 58 }, bgcolor: "#fff", color: "primary.main" }}>
+            <SportsSoccerOutlinedIcon fontSize="large" />
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="h1" sx={{ color: "inherit", fontSize: { xs: "1.65rem", sm: "2rem" } }}>
+              Sorteio dos times
+            </Typography>
+            <Typography sx={{ color: "rgba(255,255,255,0.72)" }}>
+              {summary.totalPeople === 0 ? "A bola está esperando." : `${summary.totalPeople} nomes prontos para jogar`}
+            </Typography>
+          </Box>
+          <Chip
+            icon={<SportsSoccerOutlinedIcon />}
+            label={`${summary.totalPlayers} de linha`}
+            sx={{ display: { xs: "none", sm: "inline-flex" }, bgcolor: "rgba(255,255,255,0.12)", color: "#fff", "& .MuiChip-icon": { color: "#fff" } }}
+          />
+        </Stack>
+      </Paper>
 
-      <Card>
-        <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
-          <Stack spacing={{ xs: 1.5, md: 2.5 }}>
-            <Box>
-              <Typography variant="h2">{eventMock.title}</Typography>
-              <Typography color="text.secondary" sx={{ display: { xs: "none", sm: "block" } }}>
-                Informações do evento selecionado.
-              </Typography>
-            </Box>
-
-            <Stack
-              direction={{ xs: "row", md: "row" }}
-              spacing={{ xs: 1.5, md: 2.5 }}
-              useFlexGap
-              sx={{ flexWrap: "wrap" }}
-            >
-              <Stack
-                direction="row"
-                spacing={0.75}
-                sx={{ alignItems: "center" }}
-              >
-                <CalendarMonthOutlinedIcon color="primary" fontSize="small" />
-                <Typography variant="body2">{eventDate}</Typography>
-              </Stack>
-              <Stack
-                direction="row"
-                spacing={0.75}
-                sx={{ alignItems: "center" }}
-              >
-                <AccessTimeOutlinedIcon color="primary" fontSize="small" />
-                <Typography variant="body2">{eventTime}</Typography>
-              </Stack>
-              <Stack
-                direction="row"
-                spacing={0.75}
-                sx={{ alignItems: "center" }}
-              >
-                <LocationOnOutlinedIcon color="primary" fontSize="small" />
-                <Typography variant="body2">{eventMock.location}</Typography>
-              </Stack>
-            </Stack>
-          </Stack>
-        </CardContent>
-      </Card>
-
-      <Card sx={{ display: { xs: "block", sm: "none" } }}>
-        <CardContent sx={{ p: 1.5 }}>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-            <Chip label={`${summary.totalPlayers} jogadores`} color="primary" />
-            <Chip label={`${summary.goalkeepers} goleiros`} variant="outlined" />
-            <Chip label={`${summary.guests} convidados`} variant="outlined" />
-          </Stack>
-        </CardContent>
-      </Card>
-
-      <Grid container spacing={2} sx={{ display: { xs: "none", sm: "flex" } }}>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <EventMetricCard
-            label="Confirmados"
-            value={summary.confirmed}
-            helper="Mensalistas e goleiros"
-            icon={<GroupsOutlinedIcon color="primary" />}
+      <Grid container spacing={{ xs: 2, md: 3 }}>
+        <Grid size={{ xs: 12, lg: 8 }}>
+          <ParticipantsGridCard
+            participants={participants}
+            onAdd={addParticipant}
+            onRemove={removeParticipant}
+            onClear={clearParticipants}
+            onOpenBulkImport={() => setIsBulkImportOpen(true)}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <EventMetricCard
-            label="Goleiros"
-            value={summary.goalkeepers}
-            helper="Confirmados no evento"
-            icon={<SportsHandballOutlinedIcon color="primary" />}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <EventMetricCard
-            label="Convidados"
-            value={summary.guests}
-            helper="Participantes convidados"
-            icon={<PersonAddAltOutlinedIcon color="primary" />}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
-          <EventMetricCard
-            label="Total participantes"
-            value={summary.totalPlayers}
-            helper={`${summary.goalkeepers} goleiro${summary.goalkeepers === 1 ? "" : "s"} à parte`}
-            icon={<ShuffleOutlinedIcon color="primary" />}
-          />
-        </Grid>
-      </Grid>
-
-      <Grid container spacing={2}>
         <Grid size={{ xs: 12, lg: 4 }}>
-          <Stack spacing={2}>
+          <Paper
+            variant="outlined"
+            sx={{
+              position: { lg: "sticky" },
+              top: { lg: 24 },
+              p: { xs: 2, sm: 3 },
+              bgcolor: "rgba(255,255,255,0.94)",
+              boxShadow: "0 18px 50px rgba(17, 54, 35, 0.08)",
+            }}
+          >
+            <Stack spacing={2.5}>
+              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+                <Box>
+                  <Typography variant="h3">Pronto para sortear</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {summary.goalkeepers} goleiro{summary.goalkeepers === 1 ? "" : "s"} na lista
+                  </Typography>
+                </Box>
+                <Avatar sx={{ bgcolor: "#e3f1e8", color: "primary.main" }}>
+                  <ShuffleOutlinedIcon />
+                </Avatar>
+              </Stack>
             <DrawConfigCard
               maxPlayersPerTeam={maxPlayersPerTeam}
-              drawMode={drawMode}
               onMaxPlayersPerTeamChange={setMaxPlayersPerTeam}
-              onDrawModeChange={setDrawMode}
             />
+            <Button
+              variant="outlined"
+              startIcon={<ContentPasteOutlinedIcon />}
+              onClick={() => setIsBulkImportOpen(true)}
+            >
+              Colar lista do WhatsApp
+            </Button>
             <Button
               variant="contained"
               size="large"
@@ -446,31 +412,43 @@ export function TeamDrawPage() {
                 )
               }
               onClick={runDraw}
-              disabled={isDrawing}
+              disabled={isDrawing || participants.length === 0}
               sx={{ display: { xs: "none", lg: "inline-flex" } }}
             >
-              {isDrawing ? "Gerando sorteio..." : "Gerar sorteio"}
+              {isDrawing ? "Sorteando..." : "Sortear agora"}
             </Button>
-          </Stack>
-        </Grid>
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <ParticipantsGridCard
-            participants={participants}
-            onAdd={addParticipant}
-            onRemove={removeParticipant}
-            onClear={clearParticipants}
-            onOpenBulkImport={() => setIsBulkImportOpen(true)}
-          />
+            </Stack>
+          </Paper>
         </Grid>
       </Grid>
 
       {teams.length > 0 ? (
-        <DrawResultCard
-          teams={teams}
-          onRedraw={runDraw}
-          onCopy={copyTeams}
-          onShare={shareTeams}
-        />
+        <Box
+          sx={{
+            position: "relative",
+            borderRadius: 2,
+            bgcolor: "#155b39",
+            p: { xs: 2, sm: 3 },
+            overflow: "hidden",
+            "&::before": {
+              content: '""',
+              position: "absolute",
+              inset: 12,
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 1,
+              pointerEvents: "none",
+            },
+          }}
+        >
+          <Box sx={{ position: "relative", zIndex: 1 }}>
+            <DrawResultCard
+              teams={teams}
+              onRedraw={runDraw}
+              onCopy={copyTeams}
+              onShare={shareTeams}
+            />
+          </Box>
+        </Box>
       ) : null}
 
       <BulkParticipantsDialog
@@ -487,9 +465,9 @@ export function TeamDrawPage() {
           right: 0,
           bottom: 0,
           zIndex: (theme) => theme.zIndex.appBar,
-          bgcolor: "background.paper",
-          borderTop: "1px solid",
-          borderColor: "divider",
+          bgcolor: "rgba(255,255,255,0.96)",
+          backdropFilter: "blur(10px)",
+          borderTop: "1px solid rgba(31,122,77,0.16)",
           p: 1.5,
           pb: "max(12px, env(safe-area-inset-bottom))",
         }}
@@ -505,10 +483,10 @@ export function TeamDrawPage() {
             )
           }
           onClick={runDraw}
-          disabled={isDrawing}
+          disabled={isDrawing || participants.length === 0}
           fullWidth
         >
-          {isDrawing ? "Gerando sorteio..." : `Gerar sorteio (${participants.length})`}
+          {isDrawing ? "Sorteando..." : `Sortear ${participants.length} jogadores`}
         </Button>
       </Box>
 

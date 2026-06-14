@@ -1,73 +1,82 @@
 import {
-  Card,
-  CardContent,
-  Chip,
-  FormControl,
-  FormControlLabel,
-  FormLabel,
-  Radio,
-  RadioGroup,
+  Box,
+  IconButton,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
-import type { DrawMode } from '../types'
+import RemoveOutlinedIcon from '@mui/icons-material/RemoveOutlined'
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 
 type DrawConfigCardProps = {
   maxPlayersPerTeam: number
-  drawMode: DrawMode
   onMaxPlayersPerTeamChange: (maxPlayersPerTeam: number) => void
-  onDrawModeChange: (drawMode: DrawMode) => void
 }
 
 export function DrawConfigCard({
   maxPlayersPerTeam,
-  drawMode,
   onMaxPlayersPerTeamChange,
-  onDrawModeChange,
 }: DrawConfigCardProps) {
+  const updateValue = (value: number) => {
+    onMaxPlayersPerTeamChange(Math.max(1, value))
+  }
+
   return (
-    <Card>
-      <CardContent>
-        <Stack spacing={2.5}>
-          <Stack spacing={0.5}>
-            <Typography variant="h2">Configuração do sorteio</Typography>
-            <Typography color="text.secondary">Defina como os times serão formados.</Typography>
-          </Stack>
-
-          <TextField
-            label="Máximo de jogadores de linha por time"
-            type="number"
-            value={maxPlayersPerTeam}
-            onChange={(event) => onMaxPlayersPerTeamChange(Number(event.target.value || 1))}
-            helperText="Goleiros não entram nesse limite"
-            fullWidth
-            required
-            slotProps={{ htmlInput: { min: 1 } }}
-          />
-
-          <FormControl>
-            <FormLabel>Tipo de sorteio</FormLabel>
-            <RadioGroup
-              value={drawMode}
-              onChange={(event) => onDrawModeChange(event.target.value as DrawMode)}
+    <Box>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
+        Jogadores de linha por time
+      </Typography>
+      <Stack
+        direction="row"
+        sx={{
+          alignItems: 'center',
+          width: 'fit-content',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          bgcolor: 'background.paper',
+          p: 0.5,
+        }}
+      >
+        <Tooltip title="Diminuir">
+          <span>
+            <IconButton
+              size="small"
+              onClick={() => updateValue(maxPlayersPerTeam - 1)}
+              disabled={maxPlayersPerTeam <= 1}
+              aria-label="Diminuir jogadores por time"
             >
-              <FormControlLabel value="random" control={<Radio />} label="Aleatório" />
-              <FormControlLabel
-                value="balanced"
-                disabled
-                control={<Radio />}
-                label={
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <Typography>Balanceado</Typography>
-                    <Chip label="Em breve" size="small" color="secondary" variant="outlined" />
-                  </Stack>
-                }
-              />
-            </RadioGroup>
-          </FormControl>
-        </Stack>
-      </CardContent>
-    </Card>
+              <RemoveOutlinedIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <TextField
+          type="number"
+          value={maxPlayersPerTeam}
+          onChange={(event) => updateValue(Number(event.target.value || 1))}
+          slotProps={{
+            htmlInput: {
+              min: 1,
+              'aria-label': 'Jogadores de linha por time',
+              style: { textAlign: 'center', padding: 0, fontWeight: 800, fontSize: 20 },
+            },
+          }}
+          sx={{
+            width: 52,
+            '& fieldset': { border: 0 },
+          }}
+        />
+        <Tooltip title="Aumentar">
+          <IconButton
+            size="small"
+            onClick={() => updateValue(maxPlayersPerTeam + 1)}
+            aria-label="Aumentar jogadores por time"
+          >
+            <AddOutlinedIcon />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+    </Box>
   )
 }

@@ -2,13 +2,13 @@ import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import ContentPasteOutlinedIcon from '@mui/icons-material/ContentPasteOutlined'
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined'
 import {
+  Avatar,
+  Box,
   Button,
-  Card,
-  CardContent,
   Chip,
-  Grid,
   IconButton,
   MenuItem,
+  Paper,
   Select,
   Stack,
   TextField,
@@ -16,6 +16,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import type { DrawParticipant, DrawParticipantType } from '../types'
 
 const participantTypeLabels: Record<DrawParticipantType, { label: string; color: 'default' | 'primary' | 'secondary' }> = {
@@ -49,19 +50,23 @@ export function ParticipantsGridCard({
   }
 
   return (
-    <Card>
-      <CardContent>
-        <Stack spacing={2.5}>
+    <Paper
+      variant="outlined"
+      sx={{
+        overflow: 'hidden',
+        bgcolor: 'rgba(255,255,255,0.92)',
+        boxShadow: '0 18px 50px rgba(17, 54, 35, 0.08)',
+      }}
+    >
+        <Stack spacing={2.5} sx={{ p: { xs: 2, sm: 3 } }}>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={1}
             sx={{ justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' } }}
           >
             <Stack spacing={0.5}>
-              <Typography variant="h2">Jogadores do sorteio</Typography>
-              <Typography color="text.secondary">
-                Informe os nomes e marque goleiros ou convidados quando necessário.
-              </Typography>
+              <Typography variant="h2">Quem vai jogar?</Typography>
+              <Typography color="text.secondary">{participants.length} na lista</Typography>
             </Stack>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
               <Button
@@ -134,39 +139,67 @@ export function ParticipantsGridCard({
           ) : (
             <Stack
               sx={{
-                maxHeight: { xs: 360, md: 'none' },
-                overflowY: { xs: 'auto', md: 'visible' },
+                maxHeight: { xs: 350, md: 480 },
+                overflowY: 'auto',
                 pr: { xs: 0.5, md: 0 },
               }}
             >
-              <Grid container spacing={1.5}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(2, minmax(0, 1fr))',
+                    xl: 'repeat(3, minmax(0, 1fr))',
+                  },
+                  gap: 1,
+                }}
+              >
                 {participants.map((participant) => {
                   const participantType = participantTypeLabels[participant.type]
 
                   return (
-                    <Grid key={participant.id} size={{ xs: 12, sm: 6, md: 4, xl: 3 }}>
+                    <motion.div
+                      key={participant.id}
+                      layout
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                    >
                       <Stack
                         direction="row"
                         spacing={1}
                         sx={{
                           alignItems: 'center',
-                          border: '1px solid',
-                          borderColor: 'divider',
+                          border: '1px solid rgba(31, 122, 77, 0.14)',
                           borderRadius: 2,
-                          p: 1.5,
-                          bgcolor: 'background.default',
-                          minHeight: 76,
+                          px: 1,
+                          py: 0.75,
+                          bgcolor: '#f7faf8',
+                          minHeight: 58,
                         }}
                       >
-                        <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography sx={{ fontWeight: 700 }} noWrap>
+                        <Avatar
+                          sx={{
+                            width: 34,
+                            height: 34,
+                            fontSize: 14,
+                            fontWeight: 800,
+                            bgcolor: participant.type === 'goalkeeper' ? 'primary.main' : '#dfece4',
+                            color: participant.type === 'goalkeeper' ? 'primary.contrastText' : 'primary.dark',
+                          }}
+                        >
+                          {participant.name.charAt(0).toLocaleUpperCase('pt-BR')}
+                        </Avatar>
+                        <Stack spacing={0.25} sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
                             {participant.name}
                           </Typography>
                           <Chip
                             label={participantType.label}
                             color={participantType.color}
                             size="small"
-                            sx={{ alignSelf: 'flex-start' }}
+                            sx={{ alignSelf: 'flex-start', height: 19, fontSize: 10 }}
                           />
                         </Stack>
                         <Tooltip title="Remover jogador">
@@ -179,14 +212,13 @@ export function ParticipantsGridCard({
                           </IconButton>
                         </Tooltip>
                       </Stack>
-                    </Grid>
+                    </motion.div>
                   )
                 })}
-              </Grid>
+              </Box>
             </Stack>
           )}
         </Stack>
-      </CardContent>
-    </Card>
+    </Paper>
   )
 }
