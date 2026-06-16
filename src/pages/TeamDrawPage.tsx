@@ -24,8 +24,10 @@ import {
 import { DrawResultCard } from "../features/teamDraw/components/DrawResultCard";
 import { ParticipantsGridCard } from "../features/teamDraw/components/ParticipantsGridCard";
 import type {
+  DrawLateArrivalRule,
   DrawParticipant,
   DrawParticipantType,
+  DrawSpecialGroupingConfig,
   DrawTeam,
 } from "../features/teamDraw/types";
 
@@ -46,12 +48,56 @@ type StoredDrawState = {
   maxPlayersPerTeam: number;
 };
 
+const defaultSpecialGroupings: DrawSpecialGroupingConfig[] = [
+  {
+    id: "agrupamento-fixo",
+    name: "Agrupamento fixo",
+    enabled: true,
+    target: "team",
+    preferredTeamIndexes: [0, 1],
+    rules: [
+      { name: "TZ" },
+      { name: "FILIPE" },
+      { name: "SAYA" },
+      { name: "ITALO BARROS" },
+      { name: "GABRIEL GIL" },
+      { name: "GABRIEL", aliases: ["GABEMONSTER"], type: "goalkeeper" },
+    ],
+  },
+  {
+    id: "agrupamento-ronald",
+    name: "Agrupamento Ronald",
+    enabled: true,
+    target: "team",
+    rules: [
+      { name: "RONALD" },
+      { name: "FELIPE", aliases: ["FELIPE M"] },
+      { name: "MARCO P", aliases: ["MARCO PITANGUEIRA"] },
+      { name: "JOHN", aliases: ["JONH"] },
+      { name: "DUDU", aliases: ["EDUARDO"] },
+    ],
+  },
+];
+
+const defaultLateArrivalRule: DrawLateArrivalRule = {
+  id: "joao-mendes-ultimo-time",
+  name: "Chegada tardia",
+  enabled: true,
+  aliases: ["JOAO MENDES", "JOÃO MENDES", "MENDES"],
+};
+
 function loadStoredDrawState(): StoredDrawState {
   try {
     const storedValue = window.localStorage.getItem(storageKey);
 
     if (storedValue) {
-      return JSON.parse(storedValue) as StoredDrawState;
+      const parsedState = JSON.parse(storedValue) as Partial<StoredDrawState>;
+
+      return {
+        participants: parsedState.participants ?? [],
+        teams: parsedState.teams ?? [],
+        maxPlayersPerTeam: parsedState.maxPlayersPerTeam ?? 6,
+      };
     }
   } catch {
     // A fresh state is enough when storage is unavailable or invalid.
@@ -76,32 +122,257 @@ function shuffleParticipants(participants: DrawParticipant[]) {
   return [...participants].sort(() => Math.random() - 0.5);
 }
 
-function generateTeams(
+function normalizeParticipantName(name: string) {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+}
+
+function getParticipantByRule(
   participants: DrawParticipant[],
+  rule: DrawSpecialGroupingConfig["rules"][number],
+) {
+  const ruleNames = [rule.name, ...(rule.aliases ?? [])].map((name) =>
+    normalizeParticipantName(name),
+  );
+
+  return participants.find((participant) => {
+    const hasSameName = ruleNames.includes(normalizeParticipantName(participant.name));
+    const hasSameType = !rule.type || participant.type === rule.type;
+
+    return hasSameName && hasSameType;
+  });
+}
+
+function getSpecialGroupingParticipants(
+  participants: DrawParticipant[],
+  specialGrouping: DrawSpecialGroupingConfig,
+) {
+  if (!specialGrouping.enabled) {
+    return [];
+  }
+
+  const groupedParticipants = specialGrouping.rules.map((rule) =>
+    getParticipantByRule(participants, rule),
+  );
+  const requiredParticipants = groupedParticipants.filter(
+    (_, index) => !specialGrouping.rules[index].optional,
+  );
+
+  if (requiredParticipants.some((participant) => !participant)) {
+    return [];
+  }
+
+  return groupedParticipants.filter((participant) => participant) as DrawParticipant[];
+}
+
+function getLateArrivalParticipant(
+  participants: DrawParticipant[],
+  lateArrivalRule: DrawLateArrivalRule,
+) {
+  if (!lateArrivalRule.enabled) {
+    return null;
+  }
+
+  const lateArrivalNames = lateArrivalRule.aliases.map((name) =>
+    normalizeParticipantName(name),
+  );
+
+  return (
+    participants.find((participant) =>
+      lateArrivalNames.includes(normalizeParticipantName(participant.name)),
+    ) ?? null
+  );
+}
+
+function countFieldPlayers(players: DrawParticipant[]) {
+  return players.filter((player) => player.type !== "goalkeeper").length;
+}
+
+function findTeamWithFewestFieldPlayers(
+  teams: DrawTeam[],
   maxPlayersPerTeam: number,
-): DrawTeam[] {
-  const goalkeepers = shuffleParticipants(
-    participants.filter((participant) => participant.type === "goalkeeper"),
+) {
+  const teamsWithCapacity = teams.filter(
+    (team) => countFieldPlayers(team.players) < maxPlayersPerTeam,
   );
-  const fieldPlayers = shuffleParticipants(
-    participants.filter((participant) => participant.type !== "goalkeeper"),
-  );
-  const teamCount = Math.max(
-    1,
-    Math.ceil(fieldPlayers.length / maxPlayersPerTeam),
-  );
-  const teams = Array.from({ length: teamCount }, (_, index) => ({
+  const eligibleTeams = teamsWithCapacity.length > 0 ? teamsWithCapacity : teams;
+
+  return eligibleTeams.reduce((selectedTeam, currentTeam) => {
+    if (countFieldPlayers(currentTeam.players) < countFieldPlayers(selectedTeam.players)) {
+      return currentTeam;
+    }
+
+    return selectedTeam;
+  }, eligibleTeams[0]);
+}
+
+function createDrawTeam(index: number): DrawTeam {
+  return {
     id: index + 1,
     name: teamNames[index] ?? `Time ${index + 1}`,
     color: teamColors[index] ?? "default",
-    players: fieldPlayers.slice(
-      index * maxPlayersPerTeam,
-      (index + 1) * maxPlayersPerTeam,
+    players: [],
+  };
+}
+
+function getRandomTargetTeam(
+  teams: DrawTeam[],
+  maxPlayersPerTeam: number,
+  playersToAdd: DrawParticipant[],
+  preferredTeamIndexes?: number[],
+) {
+  const fieldPlayersToAdd = countFieldPlayers(playersToAdd);
+  const preferredTeams = preferredTeamIndexes
+    ?.map((teamIndex) => teams[teamIndex])
+    .filter((team): team is DrawTeam => Boolean(team));
+  const preferredTeamsWithCapacity = preferredTeams?.filter(
+    (team) => countFieldPlayers(team.players) + fieldPlayersToAdd <= maxPlayersPerTeam,
+  );
+  const teamsWithCapacity = teams.filter(
+    (team) => countFieldPlayers(team.players) + fieldPlayersToAdd <= maxPlayersPerTeam,
+  );
+  const eligibleTeams =
+    preferredTeamsWithCapacity?.length
+      ? preferredTeamsWithCapacity
+      : teamsWithCapacity;
+
+  if (eligibleTeams.length === 0) {
+    const extraTeam = createDrawTeam(teams.length);
+
+    teams.push(extraTeam);
+    return extraTeam;
+  }
+
+  return eligibleTeams[Math.floor(Math.random() * eligibleTeams.length)];
+}
+
+function findOrCreateTeamWithFieldCapacity(
+  teams: DrawTeam[],
+  maxPlayersPerTeam: number,
+  player: DrawParticipant,
+) {
+  if (player.type === "goalkeeper") {
+    return findTeamWithFewestFieldPlayers(teams, maxPlayersPerTeam);
+  }
+
+  const teamWithCapacity = findTeamWithFewestFieldPlayers(teams, maxPlayersPerTeam);
+
+  if (countFieldPlayers(teamWithCapacity.players) < maxPlayersPerTeam) {
+    return teamWithCapacity;
+  }
+
+  const extraTeam = createDrawTeam(teams.length);
+
+  teams.push(extraTeam);
+  return extraTeam;
+}
+
+function putGoalkeepersFirst(players: DrawParticipant[]) {
+  return [
+    ...players.filter((player) => player.type === "goalkeeper"),
+    ...players.filter((player) => player.type !== "goalkeeper"),
+  ];
+}
+
+function generateTeams(
+  participants: DrawParticipant[],
+  maxPlayersPerTeam: number,
+  specialGroupings: DrawSpecialGroupingConfig[],
+  lateArrivalRule: DrawLateArrivalRule,
+): DrawTeam[] {
+  const appliedSpecialGroupings = specialGroupings
+    .map((grouping) => ({
+      grouping,
+      participants: getSpecialGroupingParticipants(participants, grouping),
+    }))
+    .filter(({ participants }) => participants.length > 0);
+  const groupedParticipantIds = new Set(
+    appliedSpecialGroupings.flatMap(({ participants }) =>
+      participants.map((participant) => participant.id),
     ),
-  }));
+  );
+  const lateArrivalParticipant = getLateArrivalParticipant(
+    participants.filter((participant) => !groupedParticipantIds.has(participant.id)),
+    lateArrivalRule,
+  );
+  const reservedParticipantIds = new Set([
+    ...groupedParticipantIds,
+    ...(lateArrivalParticipant ? [lateArrivalParticipant.id] : []),
+  ]);
+  const availableParticipants = participants.filter(
+    (participant) => !reservedParticipantIds.has(participant.id),
+  );
+  const goalkeepers = shuffleParticipants(
+    availableParticipants.filter((participant) => participant.type === "goalkeeper"),
+  );
+  const fieldPlayers = shuffleParticipants(
+    availableParticipants.filter((participant) => participant.type !== "goalkeeper"),
+  );
+  const totalFieldPlayers = participants.filter(
+    (participant) => participant.type !== "goalkeeper",
+  ).length;
+  const teamCount = Math.max(
+    1,
+    Math.ceil(totalFieldPlayers / maxPlayersPerTeam),
+  );
+  const teams: DrawTeam[] = Array.from({ length: teamCount }, (_, index) =>
+    createDrawTeam(index),
+  );
+
+  appliedSpecialGroupings.forEach(({ grouping, participants: groupingParticipants }) => {
+    const targetTeam = getRandomTargetTeam(
+      teams,
+      maxPlayersPerTeam,
+      groupingParticipants,
+      grouping.preferredTeamIndexes,
+    );
+
+    targetTeam.players.push(...shuffleParticipants(groupingParticipants));
+    targetTeam.appliedGroupingNames = [
+      ...(targetTeam.appliedGroupingNames ?? []),
+      grouping.name,
+    ];
+  });
+
+  fieldPlayers.forEach((player) => {
+    findOrCreateTeamWithFieldCapacity(teams, maxPlayersPerTeam, player).players.push(player);
+  });
 
   goalkeepers.forEach((goalkeeper, index) => {
-    teams[index % teams.length].players.unshift(goalkeeper);
+    const teamsWithoutGoalkeeper = teams.filter(
+      (team) => !team.players.some((player) => player.type === "goalkeeper"),
+    );
+    const eligibleTeams = teamsWithoutGoalkeeper.length > 0 ? teamsWithoutGoalkeeper : teams;
+    const targetTeam = eligibleTeams[index % eligibleTeams.length];
+
+    targetTeam.players.unshift(goalkeeper);
+  });
+
+  if (lateArrivalParticipant) {
+    const currentLastTeam = teams[teams.length - 1];
+    const lastTeam =
+      lateArrivalParticipant.type === "goalkeeper" ||
+      countFieldPlayers(currentLastTeam.players) < maxPlayersPerTeam
+        ? currentLastTeam
+        : createDrawTeam(teams.length);
+
+    if (!teams.includes(lastTeam)) {
+      teams.push(lastTeam);
+    }
+
+    lastTeam.players.push(lateArrivalParticipant);
+    lastTeam.appliedGroupingNames = [
+      ...(lastTeam.appliedGroupingNames ?? []),
+      lateArrivalRule.name,
+    ];
+  }
+
+  teams.forEach((team) => {
+    team.players = putGoalkeepersFirst(team.players);
   });
 
   return teams;
@@ -268,6 +539,8 @@ export function TeamDrawPage() {
       const generatedTeams = generateTeams(
         participants,
         maxPlayersPerTeam,
+        defaultSpecialGroupings,
+        defaultLateArrivalRule,
       );
       setTeams(generatedTeams);
       setIsDrawing(false);

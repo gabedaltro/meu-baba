@@ -1,13 +1,6 @@
-import {
-  Box,
-  IconButton,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import RemoveOutlinedIcon from '@mui/icons-material/RemoveOutlined'
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
+import RemoveOutlinedIcon from '@mui/icons-material/RemoveOutlined'
+import { Box, IconButton, Stack, TextField, Tooltip, Typography } from '@mui/material'
 
 type DrawConfigCardProps = {
   maxPlayersPerTeam: number
