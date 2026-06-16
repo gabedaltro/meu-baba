@@ -56,10 +56,10 @@ const defaultSpecialGroupings: DrawSpecialGroupingConfig[] = [
     target: "team",
     preferredTeamIndexes: [0, 1],
     rules: [
-      { name: "TZ" },
+      { name: "TZ", aliases: ["MARCO J"] },
       { name: "FILIPE" },
-      { name: "SAYA" },
-      { name: "ITALO BARROS" },
+      { name: "SAYA", aliases: ["IAN DOUGLAS", "IAN D"] },
+      { name: "ITALO BARROS", aliases: ["LYNHO", "ITALO B"] },
       { name: "GABRIEL GIL" },
       { name: "GABRIEL", aliases: ["GABEMONSTER"], type: "goalkeeper" },
     ],
@@ -73,7 +73,7 @@ const defaultSpecialGroupings: DrawSpecialGroupingConfig[] = [
       { name: "RONALD" },
       { name: "FELIPE", aliases: ["FELIPE M"] },
       { name: "MARCO P", aliases: ["MARCO PITANGUEIRA"] },
-      { name: "JOHN", aliases: ["JONH"] },
+      { name: "EVERTON", aliases: ["CHOUPO", "VEL"] },
       { name: "DUDU", aliases: ["EDUARDO"] },
     ],
   },
@@ -140,7 +140,9 @@ function getParticipantByRule(
   );
 
   return participants.find((participant) => {
-    const hasSameName = ruleNames.includes(normalizeParticipantName(participant.name));
+    const hasSameName = ruleNames.includes(
+      normalizeParticipantName(participant.name),
+    );
     const hasSameType = !rule.type || participant.type === rule.type;
 
     return hasSameName && hasSameType;
@@ -166,7 +168,9 @@ function getSpecialGroupingParticipants(
     return [];
   }
 
-  return groupedParticipants.filter((participant) => participant) as DrawParticipant[];
+  return groupedParticipants.filter(
+    (participant) => participant,
+  ) as DrawParticipant[];
 }
 
 function getLateArrivalParticipant(
@@ -199,10 +203,14 @@ function findTeamWithFewestFieldPlayers(
   const teamsWithCapacity = teams.filter(
     (team) => countFieldPlayers(team.players) < maxPlayersPerTeam,
   );
-  const eligibleTeams = teamsWithCapacity.length > 0 ? teamsWithCapacity : teams;
+  const eligibleTeams =
+    teamsWithCapacity.length > 0 ? teamsWithCapacity : teams;
 
   return eligibleTeams.reduce((selectedTeam, currentTeam) => {
-    if (countFieldPlayers(currentTeam.players) < countFieldPlayers(selectedTeam.players)) {
+    if (
+      countFieldPlayers(currentTeam.players) <
+      countFieldPlayers(selectedTeam.players)
+    ) {
       return currentTeam;
     }
 
@@ -230,15 +238,16 @@ function getRandomTargetTeam(
     ?.map((teamIndex) => teams[teamIndex])
     .filter((team): team is DrawTeam => Boolean(team));
   const preferredTeamsWithCapacity = preferredTeams?.filter(
-    (team) => countFieldPlayers(team.players) + fieldPlayersToAdd <= maxPlayersPerTeam,
+    (team) =>
+      countFieldPlayers(team.players) + fieldPlayersToAdd <= maxPlayersPerTeam,
   );
   const teamsWithCapacity = teams.filter(
-    (team) => countFieldPlayers(team.players) + fieldPlayersToAdd <= maxPlayersPerTeam,
+    (team) =>
+      countFieldPlayers(team.players) + fieldPlayersToAdd <= maxPlayersPerTeam,
   );
-  const eligibleTeams =
-    preferredTeamsWithCapacity?.length
-      ? preferredTeamsWithCapacity
-      : teamsWithCapacity;
+  const eligibleTeams = preferredTeamsWithCapacity?.length
+    ? preferredTeamsWithCapacity
+    : teamsWithCapacity;
 
   if (eligibleTeams.length === 0) {
     const extraTeam = createDrawTeam(teams.length);
@@ -259,7 +268,10 @@ function findOrCreateTeamWithFieldCapacity(
     return findTeamWithFewestFieldPlayers(teams, maxPlayersPerTeam);
   }
 
-  const teamWithCapacity = findTeamWithFewestFieldPlayers(teams, maxPlayersPerTeam);
+  const teamWithCapacity = findTeamWithFewestFieldPlayers(
+    teams,
+    maxPlayersPerTeam,
+  );
 
   if (countFieldPlayers(teamWithCapacity.players) < maxPlayersPerTeam) {
     return teamWithCapacity;
@@ -296,7 +308,9 @@ function generateTeams(
     ),
   );
   const lateArrivalParticipant = getLateArrivalParticipant(
-    participants.filter((participant) => !groupedParticipantIds.has(participant.id)),
+    participants.filter(
+      (participant) => !groupedParticipantIds.has(participant.id),
+    ),
     lateArrivalRule,
   );
   const reservedParticipantIds = new Set([
@@ -307,10 +321,14 @@ function generateTeams(
     (participant) => !reservedParticipantIds.has(participant.id),
   );
   const goalkeepers = shuffleParticipants(
-    availableParticipants.filter((participant) => participant.type === "goalkeeper"),
+    availableParticipants.filter(
+      (participant) => participant.type === "goalkeeper",
+    ),
   );
   const fieldPlayers = shuffleParticipants(
-    availableParticipants.filter((participant) => participant.type !== "goalkeeper"),
+    availableParticipants.filter(
+      (participant) => participant.type !== "goalkeeper",
+    ),
   );
   const totalFieldPlayers = participants.filter(
     (participant) => participant.type !== "goalkeeper",
@@ -323,30 +341,37 @@ function generateTeams(
     createDrawTeam(index),
   );
 
-  appliedSpecialGroupings.forEach(({ grouping, participants: groupingParticipants }) => {
-    const targetTeam = getRandomTargetTeam(
-      teams,
-      maxPlayersPerTeam,
-      groupingParticipants,
-      grouping.preferredTeamIndexes,
-    );
+  appliedSpecialGroupings.forEach(
+    ({ grouping, participants: groupingParticipants }) => {
+      const targetTeam = getRandomTargetTeam(
+        teams,
+        maxPlayersPerTeam,
+        groupingParticipants,
+        grouping.preferredTeamIndexes,
+      );
 
-    targetTeam.players.push(...shuffleParticipants(groupingParticipants));
-    targetTeam.appliedGroupingNames = [
-      ...(targetTeam.appliedGroupingNames ?? []),
-      grouping.name,
-    ];
-  });
+      targetTeam.players.push(...shuffleParticipants(groupingParticipants));
+      targetTeam.appliedGroupingNames = [
+        ...(targetTeam.appliedGroupingNames ?? []),
+        grouping.name,
+      ];
+    },
+  );
 
   fieldPlayers.forEach((player) => {
-    findOrCreateTeamWithFieldCapacity(teams, maxPlayersPerTeam, player).players.push(player);
+    findOrCreateTeamWithFieldCapacity(
+      teams,
+      maxPlayersPerTeam,
+      player,
+    ).players.push(player);
   });
 
   goalkeepers.forEach((goalkeeper, index) => {
     const teamsWithoutGoalkeeper = teams.filter(
       (team) => !team.players.some((player) => player.type === "goalkeeper"),
     );
-    const eligibleTeams = teamsWithoutGoalkeeper.length > 0 ? teamsWithoutGoalkeeper : teams;
+    const eligibleTeams =
+      teamsWithoutGoalkeeper.length > 0 ? teamsWithoutGoalkeeper : teams;
     const targetTeam = eligibleTeams[index % eligibleTeams.length];
 
     targetTeam.players.unshift(goalkeeper);
@@ -393,9 +418,7 @@ function formatTeamsForClipboard(teams: DrawTeam[]) {
               ? "🔵"
               : "🟡";
 
-    lines.push(
-      `${marker} ${team.name.toUpperCase()}`,
-    );
+    lines.push(`${marker} ${team.name.toUpperCase()}`);
     team.players.forEach((player) => {
       const suffix = player.type === "goalkeeper" ? " (Goleiro)" : "";
       lines.push(`${player.name}${suffix}`);
@@ -447,10 +470,7 @@ export function TeamDrawPage() {
     );
   }, [maxPlayersPerTeam, participants, teams]);
 
-  const addParticipant = (
-    rawName: string,
-    type: DrawParticipantType,
-  ) => {
+  const addParticipant = (rawName: string, type: DrawParticipantType) => {
     const name = rawName.trim();
 
     if (!name) {
@@ -459,7 +479,9 @@ export function TeamDrawPage() {
     }
 
     const isDuplicate = participants.some(
-      (participant) => participant.name.toLocaleLowerCase("pt-BR") === name.toLocaleLowerCase("pt-BR"),
+      (participant) =>
+        participant.name.toLocaleLowerCase("pt-BR") ===
+        name.toLocaleLowerCase("pt-BR"),
     );
 
     if (isDuplicate) {
@@ -481,7 +503,9 @@ export function TeamDrawPage() {
 
   const removeParticipant = (participantId: number) => {
     setParticipants((currentParticipants) =>
-      currentParticipants.filter((participant) => participant.id !== participantId),
+      currentParticipants.filter(
+        (participant) => participant.id !== participantId,
+      ),
     );
     setTeams([]);
   };
@@ -501,7 +525,10 @@ export function TeamDrawPage() {
     const uniqueParticipants = importedParticipants.filter((participant) => {
       const normalizedName = participant.name.toLocaleLowerCase("pt-BR");
 
-      if (existingNames.has(normalizedName) || importedNames.has(normalizedName)) {
+      if (
+        existingNames.has(normalizedName) ||
+        importedNames.has(normalizedName)
+      ) {
         return false;
       }
 
@@ -520,7 +547,8 @@ export function TeamDrawPage() {
     ]);
     setTeams([]);
 
-    const ignoredCount = importedParticipants.length - uniqueParticipants.length;
+    const ignoredCount =
+      importedParticipants.length - uniqueParticipants.length;
     setSnackbarMessage(
       ignoredCount > 0
         ? `${uniqueParticipants.length} jogadores importados. ${ignoredCount} duplicado(s) ignorado(s).`
@@ -544,7 +572,9 @@ export function TeamDrawPage() {
       );
       setTeams(generatedTeams);
       setIsDrawing(false);
-      setSnackbarMessage("Sorteio gerado com a quantidade automática de times.");
+      setSnackbarMessage(
+        "Sorteio gerado com a quantidade automática de times.",
+      );
     }, 700);
   };
 
@@ -610,22 +640,43 @@ export function TeamDrawPage() {
           },
         }}
       >
-        <Stack direction="row" spacing={2} sx={{ alignItems: "center", position: "relative", zIndex: 1 }}>
-          <Avatar sx={{ width: { xs: 48, sm: 58 }, height: { xs: 48, sm: 58 }, bgcolor: "#fff", color: "primary.main" }}>
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{ alignItems: "center", position: "relative", zIndex: 1 }}
+        >
+          <Avatar
+            sx={{
+              width: { xs: 48, sm: 58 },
+              height: { xs: 48, sm: 58 },
+              bgcolor: "#fff",
+              color: "primary.main",
+            }}
+          >
             <SportsSoccerOutlinedIcon fontSize="large" />
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="h1" sx={{ color: "inherit", fontSize: { xs: "1.65rem", sm: "2rem" } }}>
+            <Typography
+              variant="h1"
+              sx={{ color: "inherit", fontSize: { xs: "1.65rem", sm: "2rem" } }}
+            >
               Sorteio dos times
             </Typography>
             <Typography sx={{ color: "rgba(255,255,255,0.72)" }}>
-              {summary.totalPeople === 0 ? "A bola está esperando." : `${summary.totalPeople} nomes prontos para jogar`}
+              {summary.totalPeople === 0
+                ? "A bola está esperando."
+                : `${summary.totalPeople} nomes prontos para jogar`}
             </Typography>
           </Box>
           <Chip
             icon={<SportsSoccerOutlinedIcon />}
             label={`${summary.totalPlayers} de linha`}
-            sx={{ display: { xs: "none", sm: "inline-flex" }, bgcolor: "rgba(255,255,255,0.12)", color: "#fff", "& .MuiChip-icon": { color: "#fff" } }}
+            sx={{
+              display: { xs: "none", sm: "inline-flex" },
+              bgcolor: "rgba(255,255,255,0.12)",
+              color: "#fff",
+              "& .MuiChip-icon": { color: "#fff" },
+            }}
           />
         </Stack>
       </Paper>
@@ -652,44 +703,48 @@ export function TeamDrawPage() {
             }}
           >
             <Stack spacing={2.5}>
-              <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
+              <Stack
+                direction="row"
+                sx={{ alignItems: "center", justifyContent: "space-between" }}
+              >
                 <Box>
                   <Typography variant="h3">Pronto para sortear</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {summary.goalkeepers} goleiro{summary.goalkeepers === 1 ? "" : "s"} na lista
+                    {summary.goalkeepers} goleiro
+                    {summary.goalkeepers === 1 ? "" : "s"} na lista
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: "#e3f1e8", color: "primary.main" }}>
                   <ShuffleOutlinedIcon />
                 </Avatar>
               </Stack>
-            <DrawConfigCard
-              maxPlayersPerTeam={maxPlayersPerTeam}
-              onMaxPlayersPerTeamChange={setMaxPlayersPerTeam}
-            />
-            <Button
-              variant="outlined"
-              startIcon={<ContentPasteOutlinedIcon />}
-              onClick={() => setIsBulkImportOpen(true)}
-            >
-              Colar lista do WhatsApp
-            </Button>
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={
-                isDrawing ? (
-                  <CircularProgress color="inherit" size={18} />
-                ) : (
-                  <ShuffleOutlinedIcon />
-                )
-              }
-              onClick={runDraw}
-              disabled={isDrawing || participants.length === 0}
-              sx={{ display: { xs: "none", lg: "inline-flex" } }}
-            >
-              {isDrawing ? "Sorteando..." : "Sortear agora"}
-            </Button>
+              <DrawConfigCard
+                maxPlayersPerTeam={maxPlayersPerTeam}
+                onMaxPlayersPerTeamChange={setMaxPlayersPerTeam}
+              />
+              <Button
+                variant="outlined"
+                startIcon={<ContentPasteOutlinedIcon />}
+                onClick={() => setIsBulkImportOpen(true)}
+              >
+                Colar lista do WhatsApp
+              </Button>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={
+                  isDrawing ? (
+                    <CircularProgress color="inherit" size={18} />
+                  ) : (
+                    <ShuffleOutlinedIcon />
+                  )
+                }
+                onClick={runDraw}
+                disabled={isDrawing || participants.length === 0}
+                sx={{ display: { xs: "none", lg: "inline-flex" } }}
+              >
+                {isDrawing ? "Sorteando..." : "Sortear agora"}
+              </Button>
             </Stack>
           </Paper>
         </Grid>
@@ -759,7 +814,9 @@ export function TeamDrawPage() {
           disabled={isDrawing || participants.length === 0}
           fullWidth
         >
-          {isDrawing ? "Sorteando..." : `Sortear ${participants.length} jogadores`}
+          {isDrawing
+            ? "Sorteando..."
+            : `Sortear ${participants.length} jogadores`}
         </Button>
       </Box>
 
