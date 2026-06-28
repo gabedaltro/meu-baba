@@ -1,6 +1,7 @@
 import SportsSoccerOutlinedIcon from '@mui/icons-material/SportsSoccerOutlined'
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined'
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined'
+import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined'
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined'
 import { Avatar, Box, Button, Chip, Stack, Typography } from '@mui/material'
 import { motion } from 'framer-motion'
@@ -20,12 +21,55 @@ function getPlayerBadge(player: DrawParticipant) {
 
 type DrawResultCardProps = {
   teams: DrawTeam[]
+  lateParticipants: DrawParticipant[]
+  maxPlayersPerTeam: number
   onRedraw: () => void
   onCopy: () => void
   onShare: () => void
+  onAssignLateParticipant: (participantId: number) => void
 }
 
-export function DrawResultCard({ teams, onRedraw, onCopy, onShare }: DrawResultCardProps) {
+function getFieldPlayerCount(team: DrawTeam) {
+  return team.players.filter((player) => player.type !== 'goalkeeper').length
+}
+
+function getSuggestedTeamName(
+  teams: DrawTeam[],
+  lateParticipant: DrawParticipant,
+  maxPlayersPerTeam: number,
+) {
+  if (teams.length === 0) {
+    return null
+  }
+
+  if (lateParticipant.type === 'goalkeeper') {
+    const teamWithoutGoalkeeper = teams.find(
+      (team) => !team.players.some((player) => player.type === 'goalkeeper'),
+    )
+
+    return teamWithoutGoalkeeper?.name ?? teams[0].name
+  }
+
+  const availableTeams = teams.filter(
+    (team) => getFieldPlayerCount(team) < maxPlayersPerTeam,
+  )
+  const targetTeams = availableTeams.length > 0 ? availableTeams : teams
+
+  return [...targetTeams].sort(
+    (firstTeam, secondTeam) =>
+      getFieldPlayerCount(firstTeam) - getFieldPlayerCount(secondTeam),
+  )[0].name
+}
+
+export function DrawResultCard({
+  teams,
+  lateParticipants,
+  maxPlayersPerTeam,
+  onRedraw,
+  onCopy,
+  onShare,
+  onAssignLateParticipant,
+}: DrawResultCardProps) {
   return (
     <Box
       component={motion.section}
@@ -176,6 +220,82 @@ export function DrawResultCard({ teams, onRedraw, onCopy, onShare }: DrawResultC
               )
             })}
           </Box>
+
+          {lateParticipants.length > 0 ? (
+            <Box
+              component={motion.section}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              sx={{
+                border: '1px solid rgba(255,255,255,0.28)',
+                borderRadius: 2,
+                bgcolor: 'rgba(255,255,255,0.1)',
+                p: { xs: 1.5, sm: 2 },
+              }}
+            >
+              <Stack spacing={1.5}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <ScheduleOutlinedIcon sx={{ color: '#fff' }} />
+                  <Box>
+                    <Typography variant="h3" sx={{ color: '#fff' }}>
+                      Atrasados para completar
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)' }}>
+                      Eles ficaram fora do sorteio inicial. Quando chegarem, encaixe no time sugerido.
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                    gap: 1,
+                  }}
+                >
+                  {lateParticipants.map((participant) => {
+                    const suggestedTeamName = getSuggestedTeamName(teams, participant, maxPlayersPerTeam)
+
+                    return (
+                      <Stack
+                        key={participant.id}
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        sx={{
+                          alignItems: { xs: 'stretch', sm: 'center' },
+                          justifyContent: 'space-between',
+                          borderRadius: 2,
+                          bgcolor: 'rgba(255,255,255,0.94)',
+                          p: 1,
+                        }}
+                      >
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+                          <Avatar sx={{ width: 32, height: 32, bgcolor: '#fff1d6', color: '#9a5a00', fontSize: 13, fontWeight: 800 }}>
+                            {participant.name.charAt(0).toLocaleUpperCase('pt-BR')}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography sx={{ fontWeight: 800 }} noWrap>
+                              {participant.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Sugestão: {suggestedTeamName ?? 'aguardar time'}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                        <Button
+                          variant="contained"
+                          color="warning"
+                          onClick={() => onAssignLateParticipant(participant.id)}
+                        >
+                          Entrou
+                        </Button>
+                      </Stack>
+                    )
+                  })}
+                </Box>
+              </Stack>
+            </Box>
+          ) : null}
         </Stack>
     </Box>
   )

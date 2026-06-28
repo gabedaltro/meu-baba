@@ -1,11 +1,14 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import ContentPasteOutlinedIcon from '@mui/icons-material/ContentPasteOutlined'
 import DeleteOutlineOutlinedIcon from '@mui/icons-material/DeleteOutlineOutlined'
+import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined'
 import {
   Avatar,
   Box,
   Button,
+  Checkbox,
   Chip,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Paper,
@@ -27,10 +30,11 @@ const participantTypeLabels: Record<DrawParticipantType, { label: string; color:
 
 type ParticipantsGridCardProps = {
   participants: DrawParticipant[]
-  onAdd: (name: string, type: DrawParticipantType) => boolean
+  onAdd: (name: string, type: DrawParticipantType, isLate: boolean) => boolean
   onRemove: (participantId: number) => void
   onClear: () => void
   onOpenBulkImport: () => void
+  onToggleLate: (participantId: number) => void
 }
 
 export function ParticipantsGridCard({
@@ -39,13 +43,16 @@ export function ParticipantsGridCard({
   onRemove,
   onClear,
   onOpenBulkImport,
+  onToggleLate,
 }: ParticipantsGridCardProps) {
   const [name, setName] = useState('')
   const [type, setType] = useState<DrawParticipantType>('monthly_player')
+  const [isLate, setIsLate] = useState(false)
 
   const addParticipant = () => {
-    if (onAdd(name, type)) {
+    if (onAdd(name, type, isLate)) {
       setName('')
+      setIsLate(false)
     }
   }
 
@@ -110,6 +117,23 @@ export function ParticipantsGridCard({
               <MenuItem value="goalkeeper">Goleiro</MenuItem>
               <MenuItem value="guest">Convidado</MenuItem>
             </Select>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isLate}
+                  onChange={(event) => setIsLate(event.target.checked)}
+                />
+              }
+              label="Chega atrasado"
+              sx={{
+                minWidth: { xs: '100%', md: 155 },
+                mx: 0,
+                px: 1,
+                border: '1px solid',
+                borderColor: isLate ? 'warning.main' : 'divider',
+                borderRadius: 2,
+              }}
+            />
             <Button
               variant="contained"
               startIcon={<AddOutlinedIcon />}
@@ -157,6 +181,7 @@ export function ParticipantsGridCard({
               >
                 {participants.map((participant) => {
                   const participantType = participantTypeLabels[participant.type]
+                  const isParticipantLate = participant.arrivalStatus === 'late'
 
                   return (
                     <motion.div
@@ -175,7 +200,7 @@ export function ParticipantsGridCard({
                           borderRadius: 2,
                           px: 1,
                           py: 0.75,
-                          bgcolor: '#f7faf8',
+                          bgcolor: isParticipantLate ? '#fff8eb' : '#f7faf8',
                           minHeight: 58,
                         }}
                       >
@@ -201,7 +226,28 @@ export function ParticipantsGridCard({
                             size="small"
                             sx={{ alignSelf: 'flex-start', height: 19, fontSize: 10 }}
                           />
+                          {isParticipantLate ? (
+                            <Chip
+                              label="Chega atrasado"
+                              color="warning"
+                              size="small"
+                              sx={{ alignSelf: 'flex-start', height: 19, fontSize: 10 }}
+                            />
+                          ) : null}
                         </Stack>
+                        <Tooltip title={isParticipantLate ? 'Marcar como presente no início' : 'Marcar que chega atrasado'}>
+                          <IconButton
+                            color={isParticipantLate ? 'warning' : 'default'}
+                            aria-label={
+                              isParticipantLate
+                                ? `Marcar ${participant.name} como presente no início`
+                                : `Marcar ${participant.name} como atrasado`
+                            }
+                            onClick={() => onToggleLate(participant.id)}
+                          >
+                            <ScheduleOutlinedIcon />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip title="Remover jogador">
                           <IconButton
                             color="error"

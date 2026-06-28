@@ -82,6 +82,10 @@ function shuffleParticipants(participants: DrawParticipant[]) {
   return [...participants].sort(() => Math.random() - 0.5);
 }
 
+function isLateParticipant(participant: DrawParticipant) {
+  return participant.arrivalStatus === "late";
+}
+
 function createDrawTeam(index: number): DrawTeam {
   return {
     id: index + 1,
@@ -96,6 +100,38 @@ function putGoalkeepersFirst(players: DrawParticipant[]) {
     ...players.filter((player) => player.type === "goalkeeper"),
     ...players.filter((player) => player.type !== "goalkeeper"),
   ];
+}
+
+function getFieldPlayerCount(team: DrawTeam) {
+  return team.players.filter((player) => player.type !== "goalkeeper").length;
+}
+
+function getSuggestedTeamForLateParticipant(
+  teams: DrawTeam[],
+  participant: DrawParticipant,
+  maxPlayersPerTeam: number,
+) {
+  if (teams.length === 0) {
+    return null;
+  }
+
+  if (participant.type === "goalkeeper") {
+    const teamWithoutGoalkeeper = teams.find(
+      (team) => !team.players.some((player) => player.type === "goalkeeper"),
+    );
+
+    return teamWithoutGoalkeeper ?? teams[0];
+  }
+
+  const availableTeams = teams.filter(
+    (team) => getFieldPlayerCount(team) < maxPlayersPerTeam,
+  );
+  const targetTeams = availableTeams.length > 0 ? availableTeams : teams;
+
+  return [...targetTeams].sort(
+    (firstTeam, secondTeam) =>
+      getFieldPlayerCount(firstTeam) - getFieldPlayerCount(secondTeam),
+  )[0];
 }
 
 function generateTeams(
@@ -164,6 +200,48 @@ function formatTeamsForClipboard(teams: DrawTeam[]) {
   return lines.join("\n").trim();
 }
 
+function formatLateParticipantsForClipboard(lateParticipants: DrawParticipant[]) {
+  if (lateParticipants.length === 0) {
+    return "";
+  }
+
+  return [
+    "",
+    "⏱️ PARA COMPLETAR",
+    ...lateParticipants.map((participant) => participant.name),
+  ].join("\n");
+}
+
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Some mobile browsers block the modern API even in secure contexts.
+    }
+  }
+
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.setAttribute("readonly", "");
+  textArea.style.position = "fixed";
+  textArea.style.top = "0";
+  textArea.style.left = "-9999px";
+  textArea.style.opacity = "0";
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  textArea.setSelectionRange(0, textArea.value.length);
+
+  try {
+    return document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textArea);
+  }
+}
+
 export function TeamDrawPage() {
   const [storedDrawState] = useState(() => loadStoredDrawState());
   const [participants, setParticipants] = useState<DrawParticipant[]>(
@@ -184,15 +262,30 @@ export function TeamDrawPage() {
     const guestCount = participants.filter(
       (participant) => participant.type === "guest",
     ).length;
+    const lateCount = participants.filter(isLateParticipant).length;
+    const availableParticipants = participants.filter(
+      (participant) => !isLateParticipant(participant),
+    );
+    const availableGoalkeepers = availableParticipants.filter(
+      (participant) => participant.type === "goalkeeper",
+    ).length;
 
     return {
       confirmed: participants.length - guestCount,
       goalkeepers: goalkeeperCount,
       guests: guestCount,
+      late: lateCount,
+      available: availableParticipants.length,
+      availablePlayers: availableParticipants.length - availableGoalkeepers,
       totalPlayers: participants.length - goalkeeperCount,
       totalPeople: participants.length,
     };
   }, [participants]);
+
+  const lateParticipants = useMemo(
+    () => participants.filter(isLateParticipant),
+    [participants],
+  );
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -205,7 +298,11 @@ export function TeamDrawPage() {
     );
   }, [maxPlayersPerTeam, participants, teams]);
 
-  const addParticipant = (rawName: string, type: DrawParticipantType) => {
+  const addParticipant = (
+    rawName: string,
+    type: DrawParticipantType,
+    isLate: boolean,
+  ) => {
     const name = rawName.trim();
 
     if (!name) {
@@ -230,6 +327,7 @@ export function TeamDrawPage() {
         id: Date.now(),
         name,
         type,
+        arrivalStatus: isLate ? "late" : "on_time",
       },
     ]);
     setTeams([]);
@@ -240,6 +338,22 @@ export function TeamDrawPage() {
     setParticipants((currentParticipants) =>
       currentParticipants.filter(
         (participant) => participant.id !== participantId,
+      ),
+    );
+    setTeams([]);
+  };
+
+  const toggleLateParticipant = (participantId: number) => {
+    setParticipants((currentParticipants) =>
+      currentParticipants.map((participant) =>
+        participant.id === participantId
+          ? {
+              ...participant,
+              arrivalStatus: isLateParticipant(participant)
+                ? "on_time"
+                : "late",
+            }
+          : participant,
       ),
     );
     setTeams([]);
@@ -278,6 +392,7 @@ export function TeamDrawPage() {
         id: importTimestamp + index,
         name: participant.name,
         type: participant.type,
+        arrivalStatus: "on_time" as const,
       })),
     ]);
     setTeams([]);
@@ -292,7 +407,11 @@ export function TeamDrawPage() {
   };
 
   const runDraw = () => {
-    if (participants.length === 0) {
+    const availableParticipants = participants.filter(
+      (participant) => !isLateParticipant(participant),
+    );
+
+    if (availableParticipants.length === 0) {
       setSnackbarMessage("Adicione pelo menos um jogador antes de sortear.");
       return;
     }
@@ -300,30 +419,36 @@ export function TeamDrawPage() {
     setIsDrawing(true);
     window.setTimeout(() => {
       const generatedTeams = generateTeams(
-        participants,
+        availableParticipants,
         maxPlayersPerTeam,
       );
       setTeams(generatedTeams);
       setIsDrawing(false);
       setSnackbarMessage(
-        "Sorteio gerado com a quantidade automática de times.",
+        lateParticipants.length > 0
+          ? "Sorteio gerado. Atrasados ficaram separados para completar depois."
+          : "Sorteio gerado com a quantidade automática de times.",
       );
     }, 700);
   };
 
-  const copyTeams = async () => {
-    const text = formatTeamsForClipboard(teams);
+  const getFormattedDrawText = () =>
+    `${formatTeamsForClipboard(teams)}${formatLateParticipantsForClipboard(lateParticipants)}`;
 
-    try {
-      await navigator.clipboard.writeText(text);
+  const copyTeams = async () => {
+    const text = getFormattedDrawText();
+    const copied = await copyTextToClipboard(text);
+
+    if (copied) {
       setSnackbarMessage("Times copiados para a área de transferência.");
-    } catch {
-      setSnackbarMessage("Resultado formatado gerado para cópia.");
+      return;
     }
+
+    setSnackbarMessage("Não foi possível copiar automaticamente neste navegador.");
   };
 
   const shareTeams = async () => {
-    const text = formatTeamsForClipboard(teams);
+    const text = getFormattedDrawText();
 
     if (navigator.share) {
       try {
@@ -333,16 +458,64 @@ export function TeamDrawPage() {
         });
         setSnackbarMessage("Times compartilhados com sucesso.");
         return;
-      } catch {
-        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          setSnackbarMessage("Compartilhamento cancelado.");
+          return;
+        }
       }
     }
 
-    await copyTeams();
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    setSnackbarMessage("Abrindo WhatsApp para compartilhar os times.");
   };
 
   const closeSnackbar = () => {
     setSnackbarMessage("");
+  };
+
+  const assignLateParticipant = (participantId: number) => {
+    const participant = participants.find(
+      (currentParticipant) => currentParticipant.id === participantId,
+    );
+
+    if (!participant) {
+      return;
+    }
+
+    const suggestedTeam = getSuggestedTeamForLateParticipant(
+      teams,
+      participant,
+      maxPlayersPerTeam,
+    );
+
+    if (!suggestedTeam) {
+      setSnackbarMessage("Sorteie os times antes de encaixar atrasados.");
+      return;
+    }
+
+    setTeams((currentTeams) =>
+      currentTeams.map((team) =>
+        team.id === suggestedTeam.id
+          ? {
+              ...team,
+              players: putGoalkeepersFirst([
+                ...team.players,
+                { ...participant, arrivalStatus: "on_time" },
+              ]),
+            }
+          : team,
+      ),
+    );
+    setParticipants((currentParticipants) =>
+      currentParticipants.map((currentParticipant) =>
+        currentParticipant.id === participantId
+          ? { ...currentParticipant, arrivalStatus: "on_time" }
+          : currentParticipant,
+      ),
+    );
+    setSnackbarMessage(`${participant.name} entrou no ${suggestedTeam.name}.`);
   };
 
   return (
@@ -398,12 +571,16 @@ export function TeamDrawPage() {
             <Typography sx={{ color: "rgba(255,255,255,0.72)" }}>
               {summary.totalPeople === 0
                 ? "A bola está esperando."
-                : `${summary.totalPeople} nomes prontos para jogar`}
+                : `${summary.available} prontos para jogar${
+                    summary.late > 0
+                      ? ` e ${summary.late} atrasado${summary.late === 1 ? "" : "s"}`
+                      : ""
+                  }`}
             </Typography>
           </Box>
           <Chip
             icon={<SportsSoccerOutlinedIcon />}
-            label={`${summary.totalPlayers} de linha`}
+            label={`${summary.availablePlayers} de linha`}
             sx={{
               display: { xs: "none", sm: "inline-flex" },
               bgcolor: "rgba(255,255,255,0.12)",
@@ -422,6 +599,7 @@ export function TeamDrawPage() {
             onRemove={removeParticipant}
             onClear={clearParticipants}
             onOpenBulkImport={() => setIsBulkImportOpen(true)}
+            onToggleLate={toggleLateParticipant}
           />
         </Grid>
         <Grid size={{ xs: 12, lg: 4 }}>
@@ -445,6 +623,9 @@ export function TeamDrawPage() {
                   <Typography variant="body2" color="text.secondary">
                     {summary.goalkeepers} goleiro
                     {summary.goalkeepers === 1 ? "" : "s"} na lista
+                    {summary.late > 0
+                      ? `, ${summary.late} atrasado${summary.late === 1 ? "" : "s"}`
+                      : ""}
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: "#e3f1e8", color: "primary.main" }}>
@@ -473,7 +654,7 @@ export function TeamDrawPage() {
                   )
                 }
                 onClick={runDraw}
-                disabled={isDrawing || participants.length === 0}
+                disabled={isDrawing || summary.available === 0}
                 sx={{ display: { xs: "none", lg: "inline-flex" } }}
               >
                 {isDrawing ? "Sorteando..." : "Sortear agora"}
@@ -504,9 +685,12 @@ export function TeamDrawPage() {
           <Box sx={{ position: "relative", zIndex: 1 }}>
             <DrawResultCard
               teams={teams}
+              lateParticipants={lateParticipants}
+              maxPlayersPerTeam={maxPlayersPerTeam}
               onRedraw={runDraw}
               onCopy={copyTeams}
               onShare={shareTeams}
+              onAssignLateParticipant={assignLateParticipant}
             />
           </Box>
         </Box>
@@ -544,12 +728,12 @@ export function TeamDrawPage() {
             )
           }
           onClick={runDraw}
-          disabled={isDrawing || participants.length === 0}
+          disabled={isDrawing || summary.available === 0}
           fullWidth
         >
           {isDrawing
             ? "Sorteando..."
-            : `Sortear ${participants.length} jogadores`}
+            : `Sortear ${summary.available} jogadores`}
         </Button>
       </Box>
 
