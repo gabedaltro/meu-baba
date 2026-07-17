@@ -65,9 +65,19 @@ function sortPlayers(players: Player[]) {
 }
 
 export async function fetchPlayers() {
-  const response = await apiClient.get<PlayersResponse>('/players')
+  const response = await apiClient.get<PlayersResponse>('/players', {
+    skipAuth: true,
+  })
 
   return sortPlayers(unwrapPlayersResponse(response.data))
+}
+
+export async function fetchPlayer(playerId: string | number) {
+  const response = await apiClient.get<Player>('/players/' + playerId, {
+    skipAuth: true,
+  })
+
+  return response.data
 }
 
 export async function createPlayer(payload: PlayerPayload) {

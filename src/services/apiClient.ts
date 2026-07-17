@@ -22,7 +22,7 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const token = getAccessToken();
 
-  if (token) {
+  if (token && !config.skipAuth) {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
@@ -32,7 +32,7 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401) {
+    if (error?.response?.status === 401 && !error?.config?.skipAuth) {
       clearAccessToken();
     }
 

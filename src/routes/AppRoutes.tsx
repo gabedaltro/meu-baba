@@ -41,13 +41,13 @@ const navItems = [
 
 function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const { clearSession, isAdmin, isAuthenticated } = useAuth();
+  const { clearSession, isAdmin, isAuthenticated, isSessionLoading } = useAuth();
   const visibleNavItems = navItems.filter((item) => {
-    if (item.authOnly && !isAuthenticated) {
+    if (item.authOnly && (!isAuthenticated || isSessionLoading)) {
       return false;
     }
 
-    return !item.adminOnly || isAdmin;
+    return !item.adminOnly || (!isSessionLoading && isAdmin);
   });
 
   const disconnect = () => {
@@ -88,7 +88,7 @@ function AppLayout({ children }: { children: ReactNode }) {
                 {item.label}
               </Button>
             ))}
-            {isAuthenticated ? (
+            {isAuthenticated && !isSessionLoading ? (
               <Button
                 variant="outlined"
                 color="error"

@@ -39,7 +39,9 @@ export function mapApiPlayerToDrawParticipant(player: TeamDrawApiPlayer): DrawPa
 }
 
 export async function fetchTeamDrawPlayers() {
-  const response = await apiClient.get<PlayersResponse>('/players')
+  const response = await apiClient.get<PlayersResponse>('/players', {
+    skipAuth: true,
+  })
   const players = Array.isArray(response.data) ? response.data : response.data.data
 
   return players.filter((player) => player.isActive !== false)

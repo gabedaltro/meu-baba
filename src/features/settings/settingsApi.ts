@@ -7,10 +7,14 @@ export type PlayerGroupSetting = {
 export type Settings = {
   maxGuestsPerTeam: number;
   outfieldPlayersPerTeam: number;
-  playerGroups: PlayerGroupSetting[];
+  playerGroups?: PlayerGroupSetting[];
 };
 
-export type SettingsPayload = Settings;
+export type SettingsPayload = {
+  maxGuestsPerTeam: number;
+  outfieldPlayersPerTeam: number;
+  playerGroups: PlayerGroupSetting[];
+};
 
 export async function fetchSettings() {
   const response = await apiClient.get<Settings>("/settings");
