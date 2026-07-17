@@ -117,7 +117,7 @@ Campos opcionais, que tambem aceitam null:
 
 Na inicializacao, players existentes sao migrados automaticamente: jogadores de linha recebem MEMBER e goleiros recebem null.
 
-Gols e assistencias sao totais acumulados, iniciam em zero e aparecem nas listagens publicas. Para definir um ou ambos os valores:
+Gols e assistências sao totais acumulados, iniciam em zero e aparecem nas listagens publicas. Para definir um ou ambos os valores:
 
     PATCH /api/players/:id/stats
 

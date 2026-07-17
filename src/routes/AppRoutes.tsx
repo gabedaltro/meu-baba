@@ -1,3 +1,4 @@
+import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
@@ -8,14 +9,21 @@ import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "../features/auth/authContext";
 import { LoginPage } from "../pages/LoginPage";
 import { PlayersPage } from "../pages/PlayersPage";
+import { RankingsPage } from "../pages/RankingsPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { TeamDrawPage } from "../pages/TeamDrawPage";
 import { UsersPage } from "../pages/UsersPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 const navItems = [
+  { label: "Rankings", path: "/rankings", icon: <EmojiEventsOutlinedIcon /> },
   { label: "Sorteio", path: "/sorteio", icon: <ShuffleOutlinedIcon /> },
-  { label: "Jogadores", path: "/jogadores", icon: <GroupsOutlinedIcon /> },
+  {
+    label: "Jogadores",
+    path: "/jogadores",
+    icon: <GroupsOutlinedIcon />,
+    authOnly: true,
+  },
   {
     label: "Usuarios",
     path: "/usuarios",
@@ -31,8 +39,14 @@ const navItems = [
 ];
 
 function AppLayout({ children }: { children: ReactNode }) {
-  const { isAdmin } = useAuth();
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const { isAdmin, isAuthenticated } = useAuth();
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.authOnly && !isAuthenticated) {
+      return false;
+    }
+
+    return !item.adminOnly || isAdmin;
+  });
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#eef5f0" }}>
@@ -75,6 +89,9 @@ function AppLayout({ children }: { children: ReactNode }) {
   );
 }
 
+function PublicPage({ children }: { children: ReactNode }) {
+  return <AppLayout>{children}</AppLayout>;
+}
 function ProtectedPage({
   children,
   requireAdmin = false,
@@ -94,6 +111,15 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/sorteio" replace />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/rankings"
+        element={
+          <PublicPage>
+            <RankingsPage />
+          </PublicPage>
+        }
+      />
+      <Route path="/ranking" element={<Navigate to="/rankings" replace />} />
       <Route
         path="/sorteio"
         element={

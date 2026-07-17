@@ -1,6 +1,7 @@
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import {
@@ -22,7 +23,8 @@ import {
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../features/auth/authContext";
 import { fetchPlayers, type Player } from "../features/players/playersApi";
 import {
   fetchSettings,
@@ -71,6 +73,8 @@ function normalizeGroups(groups: PlayerGroupSetting[]) {
 }
 
 export function SettingsPage() {
+  const navigate = useNavigate();
+  const { clearSession } = useAuth();
   const [form, setForm] = useState<SettingsFormState>(defaultForm);
   const [playerGroups, setPlayerGroups] = useState<PlayerGroupSetting[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -197,6 +201,11 @@ export function SettingsPage() {
     return null;
   };
 
+  const disconnect = () => {
+    clearSession();
+    navigate("/login", { replace: true });
+  };
+
   const submitSettings = async () => {
     const maxGuestsPerTeam = getNumberValue(form.maxGuestsPerTeam, 0);
     const outfieldPlayersPerTeam = getNumberValue(
@@ -278,15 +287,29 @@ export function SettingsPage() {
               Ajustes operacionais usados pelo sorteio de times
             </Typography>
           </Box>
-          <Button
-            component={RouterLink}
-            to="/sorteio"
-            variant="outlined"
-            startIcon={<ArrowBackOutlinedIcon />}
-            sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.55)" }}
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ alignItems: { xs: "stretch", sm: "center" } }}
           >
-            Ir para sorteio
-          </Button>
+            <Button
+              component={RouterLink}
+              to="/sorteio"
+              variant="outlined"
+              startIcon={<ArrowBackOutlinedIcon />}
+              sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.55)" }}
+            >
+              Ir para sorteio
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={<LogoutOutlinedIcon />}
+              onClick={disconnect}
+            >
+              Desconectar
+            </Button>
+          </Stack>
         </Stack>
       </Paper>
 

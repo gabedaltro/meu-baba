@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../features/auth/authContext";
 import { fetchSettings } from "../features/settings/settingsApi";
 import { createTeamDraw } from "../features/teamDraw/services/drawsApi";
 import { DrawConfigCard } from "../features/teamDraw/components/DrawConfigCard";
@@ -76,6 +77,91 @@ function normalizeParticipantName(name: string) {
     .trim()
     .toLocaleLowerCase("pt-BR");
 }
+const localTeamColors: DrawTeam["color"][] = [
+  "success",
+  "default",
+  "primary",
+  "secondary",
+];
+const localTeamNames = ["Time 1", "Time 2", "Time 3", "Time 4"];
+
+function shuffleParticipants(participants: DrawParticipant[]) {
+  return [...participants].sort(() => Math.random() - 0.5);
+}
+
+function createLocalDrawTeam(index: number): DrawTeam {
+  return {
+    id: index + 1,
+    name: localTeamNames[index] ?? `Time ${index + 1}`,
+    color: localTeamColors[index % localTeamColors.length] ?? "default",
+    players: [],
+  };
+}
+
+function putGoalkeepersFirst(players: DrawParticipant[]) {
+  return [
+    ...players.filter((player) => player.type === "goalkeeper"),
+    ...players.filter((player) => player.type !== "goalkeeper"),
+  ];
+}
+
+function generateLocalTeams(
+  participants: DrawParticipant[],
+  maxPlayersPerTeam: number,
+): DrawTeam[] {
+  const safeMaxPlayersPerTeam = Math.max(1, maxPlayersPerTeam);
+  const goalkeepers = shuffleParticipants(
+    participants.filter((participant) => participant.type === "goalkeeper"),
+  );
+  const lateFieldPlayers = shuffleParticipants(
+    participants.filter(
+      (participant) =>
+        participant.type !== "goalkeeper" && participant.isLateArrival,
+    ),
+  );
+  const regularFieldPlayers = shuffleParticipants(
+    participants.filter(
+      (participant) =>
+        participant.type !== "goalkeeper" && !participant.isLateArrival,
+    ),
+  );
+  const fieldPlayerCount = regularFieldPlayers.length + lateFieldPlayers.length;
+  const teamCount = Math.max(1, Math.ceil(fieldPlayerCount / safeMaxPlayersPerTeam));
+  const teams = Array.from({ length: teamCount }, (_, index) =>
+    createLocalDrawTeam(index),
+  );
+  const lastTeam = teams[teams.length - 1];
+
+  lateFieldPlayers.forEach((player) => {
+    lastTeam.players.push(player);
+  });
+
+  regularFieldPlayers.forEach((player) => {
+    const targetTeam = teams.find((team) => {
+      const fieldPlayersInTeam = team.players.filter(
+        (teamPlayer) => teamPlayer.type !== "goalkeeper",
+      ).length;
+
+      return fieldPlayersInTeam < safeMaxPlayersPerTeam;
+    });
+
+    targetTeam?.players.push(player);
+  });
+
+  goalkeepers.forEach((goalkeeper, index) => {
+    const teamsWithoutGoalkeeper = teams.filter(
+      (team) => !team.players.some((player) => player.type === "goalkeeper"),
+    );
+    const eligibleTeams = teamsWithoutGoalkeeper.length > 0 ? teamsWithoutGoalkeeper : teams;
+    const targetTeam = eligibleTeams[index % eligibleTeams.length];
+
+    targetTeam.players.unshift(goalkeeper);
+  });
+
+  return teams
+    .map((team) => ({ ...team, players: putGoalkeepersFirst(team.players) }))
+    .filter((team) => team.players.length > 0);
+}
 function formatTeamsForClipboard(teams: DrawTeam[]) {
   const lines = ["\u26bd Baba Champion Multi Arena", ""];
 
@@ -131,6 +217,7 @@ async function copyTextToClipboard(text: string) {
 }
 
 export function TeamDrawPage() {
+  const { isAuthenticated } = useAuth();
   const [storedDrawState] = useState(() => loadStoredDrawState());
   const [participants, setParticipants] = useState<DrawParticipant[]>([]);
   const [maxPlayersPerTeam, setMaxPlayersPerTeam] = useState(
@@ -167,15 +254,18 @@ export function TeamDrawPage() {
 
   useEffect(() => {
     let isMounted = true;
-    fetchSettings()
-      .then((settings) => {
-        if (isMounted && settings.outfieldPlayersPerTeam > 0) {
-          setMaxPlayersPerTeam(settings.outfieldPlayersPerTeam);
-        }
-      })
-      .catch(() => {
-        // Settings are optional for the draw screen; keep the local/default value.
-      });
+
+    if (isAuthenticated) {
+      fetchSettings()
+        .then((settings) => {
+          if (isMounted && settings.outfieldPlayersPerTeam > 0) {
+            setMaxPlayersPerTeam(settings.outfieldPlayersPerTeam);
+          }
+        })
+        .catch(() => {
+          // Settings are optional for the draw screen; keep the local/default value.
+        });
+    }
     fetchTeamDrawPlayers()
       .then((users) => {
         if (isMounted) {
@@ -191,7 +281,7 @@ export function TeamDrawPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -330,22 +420,26 @@ export function TeamDrawPage() {
     setIsDrawing(true);
 
     try {
-      const generatedTeams = await createTeamDraw({
-        eventId: drawEventId,
-        maxOutfieldPlayersPerTeam: maxPlayersPerTeam,
-        participants: displayParticipants,
-      });
+      const generatedTeams = isAuthenticated
+        ? await createTeamDraw({
+            eventId: drawEventId,
+            maxOutfieldPlayersPerTeam: maxPlayersPerTeam,
+            participants: displayParticipants,
+          })
+        : generateLocalTeams(displayParticipants, maxPlayersPerTeam);
 
       if (generatedTeams.length === 0) {
-        setSnackbarMessage("A API nao retornou times para este sorteio.");
+        setSnackbarMessage("Nao foi possivel gerar times para este sorteio.");
         return;
       }
 
       setTeams(generatedTeams);
       setIsDrawModalOpen(true);
-      setSnackbarMessage("Sorteio gerado pela API.");
+      setSnackbarMessage(
+        isAuthenticated ? "Sorteio gerado pela API." : "Sorteio gerado.",
+      );
     } catch {
-      setSnackbarMessage("Nao foi possivel carregar os jogadores da API.");
+      setSnackbarMessage("Nao foi possivel gerar o sorteio.");
     } finally {
       setIsDrawing(false);
     }

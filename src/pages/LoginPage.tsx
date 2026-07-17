@@ -11,7 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { login } from "../features/auth/authApi";
 import { useAuth } from "../features/auth/authContext";
 
@@ -113,6 +113,9 @@ export function LoginPage() {
                 disabled={isSubmitting}
               >
                 Entrar
+              </Button>
+              <Button component={RouterLink} to="/rankings" variant="outlined">
+                Ver rankings públicos
               </Button>
             </Stack>
           </Stack>

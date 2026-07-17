@@ -12,6 +12,11 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
   IconButton,
   MenuItem,
   Paper,
@@ -39,6 +44,11 @@ import {
 
 const jerseySizes: JerseySize[] = ["XS", "S", "M", "L", "XL", "XXL"];
 
+type PlayerStatsFormState = {
+  goals: string;
+  assists: string;
+};
+
 type PlayerFormState = {
   name: string;
   nickname: string;
@@ -49,6 +59,11 @@ type PlayerFormState = {
   type: PlayerType;
   goals: string;
   assists: string;
+};
+
+const emptyStatsForm: PlayerStatsFormState = {
+  goals: "0",
+  assists: "0",
 };
 
 const emptyForm: PlayerFormState = {
@@ -89,6 +104,12 @@ function getFormFromPlayer(player: Player): PlayerFormState {
   };
 }
 
+function getStatsFormFromPlayer(player: Player): PlayerStatsFormState {
+  return {
+    goals: String(player.goals),
+    assists: String(player.assists),
+  };
+}
 function getPlayerTypeLabel(player: Player) {
   if (player.position === "GOALKEEPER") {
     return "Goleiro";
@@ -127,6 +148,11 @@ export function PlayersPage() {
   >(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [statsPlayer, setStatsPlayer] = useState<Player | null>(null);
+  const [statsForm, setStatsForm] =
+    useState<PlayerStatsFormState>(emptyStatsForm);
+  const [isSavingStats, setIsSavingStats] = useState(false);
+  const [statsErrorMessage, setStatsErrorMessage] = useState("");
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const activePlayersCount = useMemo(
@@ -193,7 +219,7 @@ export function PlayersPage() {
         assists < 0)
     ) {
       setErrorMessage(
-        "Gols e assistencias devem ser inteiros maiores ou iguais a zero.",
+        "Gols e assistências devem ser inteiros maiores ou iguais a zero.",
       );
       return;
     }
@@ -230,6 +256,140 @@ export function PlayersPage() {
     setErrorMessage("");
   };
 
+  const openStatsDialog = (player: Player) => {
+    setStatsPlayer(player);
+    setStatsForm(getStatsFormFromPlayer(player));
+    setStatsErrorMessage("");
+    setMessage("");
+  };
+
+  const closeStatsDialog = () => {
+    if (isSavingStats) {
+      return;
+    }
+
+    setStatsPlayer(null);
+    setStatsForm(emptyStatsForm);
+    setStatsErrorMessage("");
+  };
+
+  const getStatsNumber = (value: string) => {
+    if (!value) {
+      return 0;
+    }
+
+    return Number(value);
+  };
+
+  const updateStatsField = (
+    field: keyof PlayerStatsFormState,
+    value: string,
+  ) => {
+    if (value === "") {
+      setStatsForm((current) => ({ ...current, [field]: value }));
+      return;
+    }
+
+    const nextValue = Math.min(1000000, Math.max(0, Number(value)));
+
+    if (!Number.isFinite(nextValue)) {
+      return;
+    }
+
+    setStatsForm((current) => ({
+      ...current,
+      [field]: String(Math.trunc(nextValue)),
+    }));
+  };
+
+  const stepStatsField = (field: keyof PlayerStatsFormState, delta: number) => {
+    setStatsForm((current) => {
+      const currentValue = getStatsNumber(current[field]);
+      const nextValue = Math.min(1000000, Math.max(0, currentValue + delta));
+
+      return { ...current, [field]: String(nextValue) };
+    });
+  };
+
+  const shouldConfirmStatsReduction = (
+    currentPlayer: Player,
+    nextGoals: number,
+    nextAssists: number,
+  ) => {
+    const clearedGoals = currentPlayer.goals > 0 && nextGoals === 0;
+    const clearedAssists = currentPlayer.assists > 0 && nextAssists === 0;
+    const reducedGoalsALot = currentPlayer.goals - nextGoals >= 10;
+    const reducedAssistsALot = currentPlayer.assists - nextAssists >= 10;
+
+    return (
+      clearedGoals || clearedAssists || reducedGoalsALot || reducedAssistsALot
+    );
+  };
+
+  const saveStats = async () => {
+    if (!statsPlayer) {
+      return;
+    }
+
+    const goals = getStatsNumber(statsForm.goals);
+    const assists = getStatsNumber(statsForm.assists);
+
+    if (
+      !Number.isInteger(goals) ||
+      !Number.isInteger(assists) ||
+      goals < 0 ||
+      assists < 0 ||
+      goals > 1000000 ||
+      assists > 1000000
+    ) {
+      setStatsErrorMessage(
+        "Gols e assistências devem ser inteiros entre 0 e 1.000.000.",
+      );
+      return;
+    }
+
+    if (
+      shouldConfirmStatsReduction(statsPlayer, goals, assists) &&
+      !window.confirm("Confirmar reducao grande ou zerar estatisticas?")
+    ) {
+      return;
+    }
+
+    setIsSavingStats(true);
+    setStatsErrorMessage("");
+    setMessage("");
+
+    try {
+      const updatedPlayer = await updatePlayerStats(statsPlayer.id, {
+        goals,
+        assists,
+      });
+
+      setPlayers((currentPlayers) =>
+        currentPlayers.map((player) =>
+          String(player.id) === String(updatedPlayer.id)
+            ? updatedPlayer
+            : player,
+        ),
+      );
+
+      if (String(editingPlayerId) === String(updatedPlayer.id)) {
+        setForm((current) => ({
+          ...current,
+          goals: String(updatedPlayer.goals),
+          assists: String(updatedPlayer.assists),
+        }));
+      }
+
+      setMessage("Estatisticas atualizadas com sucesso.");
+      setStatsPlayer(null);
+      setStatsForm(emptyStatsForm);
+    } catch {
+      setStatsErrorMessage("Nao foi possivel salvar as estatisticas.");
+    } finally {
+      setIsSavingStats(false);
+    }
+  };
   const togglePlayerStatus = async (player: Player) => {
     setErrorMessage("");
     setMessage("");
@@ -425,7 +585,7 @@ export function PlayersPage() {
                   fullWidth
                 />
                 <TextField
-                  label="Assistencias"
+                  label="Assistências"
                   type="number"
                   value={form.assists}
                   onChange={(event) =>
@@ -523,7 +683,11 @@ export function PlayersPage() {
                         {player.name}
                       </Typography>
                       {getPlayerSubtitle(player) ? (
-                        <Typography variant="caption" color="text.secondary" noWrap>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          noWrap
+                        >
                           {getPlayerSubtitle(player)}
                         </Typography>
                       ) : null}
@@ -558,6 +722,15 @@ export function PlayersPage() {
                         />
                       </Stack>
                     </Stack>
+                    <Tooltip title="Atualizar estatisticas">
+                      <IconButton
+                        color="primary"
+                        onClick={() => openStatsDialog(player)}
+                        aria-label={`Atualizar gols e assistências de ${player.name}`}
+                      >
+                        <SportsSoccerOutlinedIcon />
+                      </IconButton>
+                    </Tooltip>
                     <Tooltip title="Editar jogador">
                       <IconButton
                         onClick={() => editPlayer(player)}
@@ -591,6 +764,167 @@ export function PlayersPage() {
           </Stack>
         </Paper>
       </Box>
+      <Dialog
+        open={Boolean(statsPlayer)}
+        onClose={closeStatsDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Atualizar estatisticas</DialogTitle>
+        <DialogContent>
+          {statsPlayer ? (
+            <Stack spacing={2.25} sx={{ pt: 1 }}>
+              <Stack
+                direction="row"
+                spacing={1.5}
+                sx={{ alignItems: "center" }}
+              >
+                <Avatar
+                  src={statsPlayer.photoUrl ?? undefined}
+                  alt={statsPlayer.name}
+                  sx={{ width: 58, height: 58, bgcolor: "primary.main" }}
+                >
+                  {statsPlayer.name.charAt(0).toLocaleUpperCase("pt-BR")}
+                </Avatar>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="h3" noWrap>
+                    {statsPlayer.name}
+                  </Typography>
+                  <Typography color="text.secondary">
+                    Atual: {statsPlayer.goals} gol
+                    {statsPlayer.goals === 1 ? "" : "s"} e {statsPlayer.assists}{" "}
+                    assist{statsPlayer.assists === 1 ? "" : "s"}
+                  </Typography>
+                </Box>
+              </Stack>
+
+              {statsErrorMessage ? (
+                <Alert severity="error">{statsErrorMessage}</Alert>
+              ) : null}
+
+              <Divider />
+
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  gap: 2,
+                }}
+              >
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: "#f7faf8" }}>
+                  <Stack spacing={1.5}>
+                    <Typography sx={{ fontWeight: 900 }}>Gols</Typography>
+                    <TextField
+                      type="number"
+                      value={statsForm.goals}
+                      onChange={(event) =>
+                        updateStatsField("goals", event.target.value)
+                      }
+                      slotProps={{
+                        htmlInput: { min: 0, max: 1000000, step: 1 },
+                      }}
+                      fullWidth
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant="outlined"
+                        size="large"
+                        onClick={() => stepStatsField("goals", -1)}
+                        disabled={
+                          isSavingStats || getStatsNumber(statsForm.goals) <= 0
+                        }
+                        fullWidth
+                        aria-label="Diminuir um gol"
+                      >
+                        -1
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        onClick={() => stepStatsField("goals", 1)}
+                        disabled={
+                          isSavingStats ||
+                          getStatsNumber(statsForm.goals) >= 1000000
+                        }
+                        fullWidth
+                        aria-label="Adicionar um gol"
+                      >
+                        +1
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: "#f7faf8" }}>
+                  <Stack spacing={1.5}>
+                    <Typography sx={{ fontWeight: 900 }}>
+                      Assistências
+                    </Typography>
+                    <TextField
+                      type="number"
+                      value={statsForm.assists}
+                      onChange={(event) =>
+                        updateStatsField("assists", event.target.value)
+                      }
+                      slotProps={{
+                        htmlInput: { min: 0, max: 1000000, step: 1 },
+                      }}
+                      fullWidth
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant="outlined"
+                        size="large"
+                        onClick={() => stepStatsField("assists", -1)}
+                        disabled={
+                          isSavingStats ||
+                          getStatsNumber(statsForm.assists) <= 0
+                        }
+                        fullWidth
+                        aria-label="Diminuir uma assistencia"
+                      >
+                        -1
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="large"
+                        onClick={() => stepStatsField("assists", 1)}
+                        disabled={
+                          isSavingStats ||
+                          getStatsNumber(statsForm.assists) >= 1000000
+                        }
+                        fullWidth
+                        aria-label="Adicionar uma assistencia"
+                      >
+                        +1
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              </Box>
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={closeStatsDialog} disabled={isSavingStats}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void saveStats()}
+            disabled={isSavingStats}
+            startIcon={
+              isSavingStats ? (
+                <CircularProgress color="inherit" size={18} />
+              ) : (
+                <SaveOutlinedIcon />
+              )
+            }
+          >
+            Salvar estatisticas
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

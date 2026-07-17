@@ -1,4 +1,14 @@
 import axios from "axios";
+
+declare module "axios" {
+  export interface InternalAxiosRequestConfig {
+    skipAuth?: boolean;
+  }
+
+  export interface AxiosRequestConfig {
+    skipAuth?: boolean;
+  }
+}
 import { clearAccessToken, getAccessToken } from "../features/auth/authStorage";
 
 export const apiClient = axios.create({
