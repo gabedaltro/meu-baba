@@ -8,15 +8,20 @@ export type TeamDrawApiPlayer = {
   jerseyNumber?: number | null
   photoUrl?: string | null
   position: 'GOALKEEPER' | 'OUTFIELD'
+  type?: 'MEMBER' | 'GUEST' | null
   isActive?: boolean
 }
 
 type PlayersResponse = TeamDrawApiPlayer[] | { data: TeamDrawApiPlayer[] }
 
-export function mapPlayerPositionToParticipantType(
-  position: TeamDrawApiPlayer['position'],
+export function mapApiPlayerToParticipantType(
+  player: TeamDrawApiPlayer,
 ): DrawParticipantType {
-  return position === 'GOALKEEPER' ? 'goalkeeper' : 'monthly_player'
+  if (player.position === 'GOALKEEPER') {
+    return 'goalkeeper'
+  }
+
+  return player.type === 'GUEST' ? 'guest' : 'monthly_player'
 }
 
 export function mapApiPlayerToDrawParticipant(player: TeamDrawApiPlayer): DrawParticipant {
@@ -28,7 +33,7 @@ export function mapApiPlayerToDrawParticipant(player: TeamDrawApiPlayer): DrawPa
     name: player.name,
     nickname: player.nickname ?? undefined,
     jerseyNumber: player.jerseyNumber ?? undefined,
-    type: mapPlayerPositionToParticipantType(player.position),
+    type: mapApiPlayerToParticipantType(player),
     photoUrl: player.photoUrl ?? undefined,
   }
 }

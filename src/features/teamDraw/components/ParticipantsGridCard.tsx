@@ -7,6 +7,7 @@ import {
   Avatar,
   Box,
   Button,
+  Checkbox,
   Chip,
   IconButton,
   MenuItem,
@@ -33,7 +34,7 @@ type ParticipantsGridCardProps = {
   participants: DrawParticipant[];
   availablePlayers: DrawParticipant[];
   isLoadingPlayers: boolean;
-  onAdd: (playerId: string) => boolean;
+  onAdd: (playerIds: string[]) => number;
   onAddMonthlyPlayers: () => void;
   onOpenGuestImport: () => void;
   onToggleLateArrival: (participantId: string) => void;
@@ -56,7 +57,7 @@ function getPlayerDetails(player: DrawParticipant) {
     details.push(player.nickname);
   }
 
-  return details.join(" · ");
+  return details.join(" - ");
 }
 
 export function ParticipantsGridCard({
@@ -70,13 +71,7 @@ export function ParticipantsGridCard({
   onRemove,
   onClear,
 }: ParticipantsGridCardProps) {
-  const [selectedPlayerId, setSelectedPlayerId] = useState("");
-  const selectedPlayer = availablePlayers.find(
-    (player) => String(player.id) === selectedPlayerId,
-  );
-  const selectedPlayerType = selectedPlayer
-    ? participantTypeLabels[selectedPlayer.type]
-    : null;
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   const participantIds = useMemo(
     () => new Set(participants.map((participant) => String(participant.id))),
     [participants],
@@ -89,8 +84,10 @@ export function ParticipantsGridCard({
   );
 
   const addParticipant = () => {
-    if (onAdd(selectedPlayerId)) {
-      setSelectedPlayerId("");
+    const addedCount = onAdd(selectedPlayerIds);
+
+    if (addedCount > 0) {
+      setSelectedPlayerIds([]);
     }
   };
 
@@ -128,28 +125,55 @@ export function ParticipantsGridCard({
           </Button>
         </Stack>
 
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          useFlexGap
+          sx={{ flexWrap: "wrap", alignItems: "stretch" }}
+        >
           <Select
-            value={selectedPlayerId}
-            onChange={(event) => setSelectedPlayerId(event.target.value)}
+            multiple
+            value={selectedPlayerIds}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSelectedPlayerIds(
+                typeof value === "string" ? value.split(",") : value,
+              );
+            }}
             displayEmpty
             disabled={isLoadingPlayers || selectablePlayers.length === 0}
-            sx={{ flex: 1 }}
+            sx={{ flex: "1 1 260px", minWidth: { xs: "100%", sm: 260 } }}
+            renderValue={(selected) => {
+              if (selected.length === 0) {
+                return isLoadingPlayers
+                  ? "Carregando jogadores..."
+                  : selectablePlayers.length === 0
+                    ? "Nenhum jogador cadastrado disponivel"
+                    : "Selecione jogadores cadastrados";
+              }
+
+              return `${selected.length} jogador${
+                selected.length === 1 ? "" : "es"
+              } selecionado${selected.length === 1 ? "" : "s"}`;
+            }}
           >
             <MenuItem value="" disabled>
               {isLoadingPlayers
                 ? "Carregando jogadores..."
                 : selectablePlayers.length === 0
                   ? "Nenhum jogador cadastrado disponivel"
-                  : "Selecione um jogador cadastrado"}
+                  : "Selecione jogadores cadastrados"}
             </MenuItem>
             {selectablePlayers.map((player) => {
+              const playerId = String(player.id);
+
               return (
-                <MenuItem key={player.id} value={String(player.id)}>
+                <MenuItem key={player.id} value={playerId}>
+                  <Checkbox checked={selectedPlayerIds.includes(playerId)} />
                   <Stack
                     direction="row"
                     spacing={1}
-                    sx={{ alignItems: "center" }}
+                    sx={{ alignItems: "center", minWidth: 0 }}
                   >
                     <Avatar
                       src={player.photoUrl}
@@ -175,17 +199,29 @@ export function ParticipantsGridCard({
             variant="contained"
             startIcon={<AddOutlinedIcon />}
             onClick={addParticipant}
-            disabled={!selectedPlayerId}
-            sx={{ minWidth: { xs: "100%", md: 130 } }}
+            disabled={selectedPlayerIds.length === 0}
+            sx={{
+              flex: "1 1 150px",
+              minWidth: 0,
+              maxWidth: { xs: "none", lg: 180 },
+              whiteSpace: "normal",
+              lineHeight: 1.15,
+            }}
           >
-            Adicionar
+            Adicionar selecionados
           </Button>
           <Button
             variant="outlined"
             startIcon={<GroupAddOutlinedIcon />}
             onClick={onAddMonthlyPlayers}
             disabled={isLoadingPlayers || selectableMonthlyPlayers.length === 0}
-            sx={{ minWidth: { xs: "100%", md: 190 } }}
+            sx={{
+              flex: "1 1 170px",
+              minWidth: 0,
+              maxWidth: { xs: "none", lg: 210 },
+              whiteSpace: "normal",
+              lineHeight: 1.15,
+            }}
           >
             Adicionar mensalistas
           </Button>
@@ -193,34 +229,17 @@ export function ParticipantsGridCard({
             variant="outlined"
             startIcon={<PersonAddAltOutlinedIcon />}
             onClick={onOpenGuestImport}
-            sx={{ minWidth: { xs: "100%", md: 150 } }}
+            sx={{
+              flex: "1 1 140px",
+              minWidth: 0,
+              maxWidth: { xs: "none", lg: 170 },
+              whiteSpace: "normal",
+              lineHeight: 1.15,
+            }}
           >
             Convidados
           </Button>
         </Stack>
-
-        {selectedPlayer && selectedPlayerType ? (
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <Avatar
-              src={selectedPlayer.photoUrl}
-              alt={selectedPlayer.name}
-              sx={{ width: 34, height: 34 }}
-            >
-              {selectedPlayer.name.charAt(0).toLocaleUpperCase("pt-BR")}
-            </Avatar>
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {getDisplayName(selectedPlayer)}
-            </Typography>
-            <Chip
-              label={selectedPlayerType.label}
-              color={selectedPlayerType.color}
-              size="small"
-            />
-            {selectedPlayer.jerseyNumber ? (
-              <Chip label={`#${selectedPlayer.jerseyNumber}`} size="small" />
-            ) : null}
-          </Stack>
-        ) : null}
 
         {participants.length === 0 ? (
           <Stack

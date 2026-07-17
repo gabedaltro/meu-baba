@@ -1,6 +1,7 @@
 import { apiClient } from '../../services/apiClient'
 
 export type PlayerPosition = 'GOALKEEPER' | 'OUTFIELD'
+export type PlayerType = 'MEMBER' | 'GUEST'
 export type JerseySize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL'
 
 export type Player = {
@@ -11,6 +12,7 @@ export type Player = {
   jerseySize?: JerseySize | null
   photoUrl?: string | null
   position: PlayerPosition
+  type?: PlayerType | null
   isActive: boolean
   deactivatedAt?: string | null
 }
@@ -22,6 +24,7 @@ export type PlayerPayload = {
   jerseySize?: JerseySize | null
   photoUrl?: string | null
   position: PlayerPosition
+  type?: PlayerType | null
 }
 
 type PlayersResponse = Player[] | { data: Player[] }
@@ -30,10 +33,34 @@ function unwrapPlayersResponse(response: PlayersResponse) {
   return Array.isArray(response) ? response : response.data
 }
 
+function getPlayerTypeOrder(player: Player) {
+  if (player.position === 'GOALKEEPER') {
+    return 0
+  }
+
+  return player.type === 'GUEST' ? 2 : 1
+}
+
+function sortPlayers(players: Player[]) {
+  return [...players].sort((firstPlayer, secondPlayer) => {
+    if (firstPlayer.isActive !== secondPlayer.isActive) {
+      return firstPlayer.isActive ? -1 : 1
+    }
+
+    const typeOrderDiff = getPlayerTypeOrder(firstPlayer) - getPlayerTypeOrder(secondPlayer)
+
+    if (typeOrderDiff !== 0) {
+      return typeOrderDiff
+    }
+
+    return firstPlayer.name.localeCompare(secondPlayer.name, 'pt-BR')
+  })
+}
+
 export async function fetchPlayers() {
   const response = await apiClient.get<PlayersResponse>('/players')
 
-  return unwrapPlayersResponse(response.data)
+  return sortPlayers(unwrapPlayersResponse(response.data))
 }
 
 export async function createPlayer(payload: PlayerPayload) {
@@ -59,4 +86,3 @@ export async function activatePlayer(playerId: string | number) {
 
   return response.data
 }
-

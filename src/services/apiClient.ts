@@ -2,7 +2,8 @@ import axios from "axios";
 import { clearAccessToken, getAccessToken } from "../features/auth/authStorage";
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:3000/api",
+  baseURL:
+    import.meta.env.VITE_API_URL ?? "https://meu-baba-api.vercel.app/api",
   headers: {
     Accept: "application/json",
   },

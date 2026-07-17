@@ -80,7 +80,8 @@ Player representa um jogador ou participante do sorteio:
       "jerseyNumber": 10,
       "jerseySize": "L",
       "photoUrl": "https://example.com/players/joao.jpg",
-      "position": "OUTFIELD"
+      "position": "OUTFIELD",
+      "type": "MEMBER"
     }
 
 Rotas publicas:
@@ -95,12 +96,15 @@ Rotas protegidas:
 - PATCH /api/players/:id/deactivate
 - PATCH /api/players/:id/activate
 
-Não existe exclusao fisica de player. A inativacao define isActive como false e preenche deactivatedAt. A reativacao restaura isActive e limpa deactivatedAt. A listagem inclui ativos e inativos, ordenando os ativos primeiro.
+Nao existe exclusao fisica de player. A inativacao define isActive como false e preenche deactivatedAt. A reativacao restaura isActive e limpa deactivatedAt.
+
+A listagem ordena os ativos antes dos inativos. Dentro de cada grupo, a ordem e: goleiros, mensalistas (MEMBER) e convidados (GUEST).
 
 Campos obrigatorios:
 
 - name
 - position: GOALKEEPER ou OUTFIELD
+- type: deve ser null para GOALKEEPER e MEMBER ou GUEST para OUTFIELD
 
 Campos opcionais, que tambem aceitam null:
 
@@ -109,12 +113,73 @@ Campos opcionais, que tambem aceitam null:
 - jerseySize: XS, S, M, L, XL ou XXL
 - photoUrl: URL HTTP ou HTTPS
 
+Na inicializacao, players existentes sao migrados automaticamente: jogadores de linha recebem MEMBER e goleiros recebem null.
+
+## Settings
+
+Settings representa a configuracao unica usada pelo sorteio. As duas rotas sao protegidas por JWT:
+
+- GET /api/settings
+- PUT /api/settings
+
+O GET responde com 404 enquanto a configuracao ainda nao tiver sido criada. O PUT cria ou substitui a configuracao atual.
+
+Exemplo:
+
+    {
+      "maxGuestsPerTeam": 2,
+      "outfieldPlayersPerTeam": 5,
+      "playerGroups": [
+        {
+          "playerIds": [
+            "primeiro-player-uuid",
+            "segundo-player-uuid"
+          ]
+        }
+      ]
+    }
+
+Cada grupo exige pelo menos dois players ativos. Um player nao pode aparecer mais de uma vez nem participar de grupos diferentes. Todos os IDs precisam existir. playerGroups e retornado nas respostas autenticadas de GET e PUT para permitir visualizar, editar e remover agrupamentos. O sorteio continua carregando essa configuracao internamente.
+
+## Draws
+
+Todas as rotas de sorteio exigem JWT:
+
+- POST /api/draws
+- GET /api/draws/:id
+- GET /api/events/:eventId/draws/latest
+
+Exemplo de criacao:
+
+    {
+      "eventId": "uuid-v4-do-evento",
+      "maxOutfieldPlayersPerTeam": 5,
+      "participants": [
+        {
+          "playerId": "uuid-v4-do-player",
+          "type": "MEMBER",
+          "isLateArrival": false
+        },
+        {
+          "name": "Convidado Victor",
+          "type": "GUEST",
+          "isLateArrival": true
+        }
+      ]
+    }
+
+O sorteio usa maxOutfieldPlayersPerTeam do payload. O outfieldPlayersPerTeam de settings e somente um default para a interface. maxGuestsPerTeam e playerGroups sao carregados internamente.
+
+Para um player cadastrado, position e type sao obtidos do cadastro; se type for enviado no payload, ele precisa coincidir com o valor salvo. Convidados manuais exigem name e type GUEST.
+
+Goleiros usam type null, nao ocupam vaga de linha e aparecem primeiro no time. Players OUTFIELD MEMBER e OUTFIELD GUEST ocupam vaga de linha. Tanto convidados cadastrados quanto manuais respeitam maxGuestsPerTeam. Atrasados sao direcionados preferencialmente ao ultimo time. Somente participantes enviados entram no sorteio.
+
+Os resultados ficam persistidos nas tabelas draws, draw_teams e draw_team_players, incluindo convidados e isLateArrival.
+
 ## Banco de dados
 
-O SQLite cria automaticamente as tabelas users e players em data/meu-baba.sqlite.
+O SQLite cria automaticamente as tabelas users, players, settings, draws, draw_teams e draw_team_players em data/meu-baba.sqlite.
 
 ## Testes
 
     npm test
-
-

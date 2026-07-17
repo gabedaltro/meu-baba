@@ -32,6 +32,7 @@ import {
   type Player,
   type PlayerPayload,
   type PlayerPosition,
+  type PlayerType,
   updatePlayer,
 } from "../features/players/playersApi";
 
@@ -44,6 +45,7 @@ type PlayerFormState = {
   jerseySize: "" | JerseySize;
   photoUrl: string;
   position: PlayerPosition;
+  type: PlayerType;
 };
 
 const emptyForm: PlayerFormState = {
@@ -53,6 +55,7 @@ const emptyForm: PlayerFormState = {
   jerseySize: "",
   photoUrl: "",
   position: "OUTFIELD",
+  type: "MEMBER",
 };
 
 function getPlayerPayload(form: PlayerFormState): PlayerPayload {
@@ -63,6 +66,7 @@ function getPlayerPayload(form: PlayerFormState): PlayerPayload {
     jerseySize: form.jerseySize || null,
     photoUrl: form.photoUrl.trim() || null,
     position: form.position,
+    type: form.position === "GOALKEEPER" ? null : form.type,
   };
 }
 
@@ -74,11 +78,24 @@ function getFormFromPlayer(player: Player): PlayerFormState {
     jerseySize: player.jerseySize ?? "",
     photoUrl: player.photoUrl ?? "",
     position: player.position,
+    type: player.type ?? "MEMBER",
   };
 }
 
-function getPositionLabel(position: PlayerPosition) {
-  return position === "GOALKEEPER" ? "Goleiro" : "Linha";
+function getPlayerTypeLabel(player: Player) {
+  if (player.position === "GOALKEEPER") {
+    return "Goleiro";
+  }
+
+  return player.type === "GUEST" ? "Convidado" : "Mensalista";
+}
+
+function getPlayerTypeColor(player: Player) {
+  if (player.position === "GOALKEEPER") {
+    return "primary";
+  }
+
+  return player.type === "GUEST" ? "secondary" : "default";
 }
 
 function getPlayerSubtitle(player: Player) {
@@ -114,7 +131,7 @@ export function PlayersPage() {
     try {
       setPlayers(await fetchPlayers());
     } catch {
-      setErrorMessage("Não foi possível carregar os jogadores.");
+      setErrorMessage("Nao foi possivel carregar os jogadores.");
     } finally {
       setIsLoading(false);
     }
@@ -131,7 +148,7 @@ export function PlayersPage() {
       })
       .catch(() => {
         if (isMounted) {
-          setErrorMessage("Não foi possível carregar os jogadores.");
+          setErrorMessage("Nao foi possivel carregar os jogadores.");
         }
       })
       .finally(() => {
@@ -174,7 +191,7 @@ export function PlayersPage() {
       resetForm();
       await loadPlayers();
     } catch {
-      setErrorMessage("Não foi possível salvar o jogador.");
+      setErrorMessage("Nao foi possivel salvar o jogador.");
     } finally {
       setIsSaving(false);
     }
@@ -202,7 +219,7 @@ export function PlayersPage() {
 
       await loadPlayers();
     } catch {
-      setErrorMessage("Não foi possível alterar o status do jogador.");
+      setErrorMessage("Nao foi possivel alterar o status do jogador.");
     }
   };
 
@@ -341,6 +358,20 @@ export function PlayersPage() {
               <MenuItem value="OUTFIELD">Linha</MenuItem>
               <MenuItem value="GOALKEEPER">Goleiro</MenuItem>
             </Select>
+            <Select
+              value={form.type}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  type: event.target.value as PlayerType,
+                }))
+              }
+              disabled={form.position === "GOALKEEPER"}
+              fullWidth
+            >
+              <MenuItem value="MEMBER">Mensalista</MenuItem>
+              <MenuItem value="GUEST">Convidado</MenuItem>
+            </Select>
             <TextField
               label="URL da foto"
               value={form.photoUrl}
@@ -446,13 +477,9 @@ export function PlayersPage() {
                         sx={{ flexWrap: "wrap", mt: 0.5 }}
                       >
                         <Chip
-                          label={getPositionLabel(player.position)}
+                          label={getPlayerTypeLabel(player)}
                           size="small"
-                          color={
-                            player.position === "GOALKEEPER"
-                              ? "primary"
-                              : "default"
-                          }
+                          color={getPlayerTypeColor(player)}
                         />
                         <Chip
                           label={player.isActive ? "Ativo" : "Inativo"}

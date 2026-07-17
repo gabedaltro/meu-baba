@@ -1,4 +1,5 @@
 import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import SportsSoccerOutlinedIcon from "@mui/icons-material/SportsSoccerOutlined";
 import {
   Alert,
@@ -15,6 +16,9 @@ import {
 } from "@mui/material";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
+import { fetchSettings } from "../features/settings/settingsApi";
+import { createTeamDraw } from "../features/teamDraw/services/drawsApi";
 import { DrawConfigCard } from "../features/teamDraw/components/DrawConfigCard";
 import { DrawMatchModal } from "../features/teamDraw/components/DrawMatchModal";
 import { DrawResultCard } from "../features/teamDraw/components/DrawResultCard";
@@ -40,6 +44,8 @@ const eventMock = {
   startsAt: todayEventDate,
   location: "Champion Multi Arena",
 };
+
+const drawEventId = "00000000-0000-4000-8000-000000000001";
 
 const storageKey = "meu-baba-draw-state";
 
@@ -67,18 +73,6 @@ function loadStoredDrawState(): StoredDrawState {
   };
 }
 
-const teamColors: DrawTeam["color"][] = [
-  "success",
-  "default",
-  "primary",
-  "secondary",
-];
-const teamNames = ["Time 1", "Time 2", "Time 3", "Time 4"];
-
-function shuffleParticipants(participants: DrawParticipant[]) {
-  return [...participants].sort(() => Math.random() - 0.5);
-}
-
 function normalizeParticipantName(name: string) {
   return name
     .normalize("NFD")
@@ -87,82 +81,7 @@ function normalizeParticipantName(name: string) {
     .trim()
     .toLocaleLowerCase("pt-BR");
 }
-
-function createDrawTeam(index: number): DrawTeam {
-  return {
-    id: index + 1,
-    name: teamNames[index] ?? `Time ${index + 1}`,
-    color: teamColors[index] ?? "default",
-    players: [],
-  };
-}
-
-function putGoalkeepersFirst(players: DrawParticipant[]) {
-  return [
-    ...players.filter((player) => player.type === "goalkeeper"),
-    ...players.filter((player) => player.type !== "goalkeeper"),
-  ];
-}
-
-function generateTeams(
-  participants: DrawParticipant[],
-  maxPlayersPerTeam: number,
-): DrawTeam[] {
-  const goalkeepers = shuffleParticipants(
-    participants.filter((participant) => participant.type === "goalkeeper"),
-  );
-  const lateFieldPlayers = shuffleParticipants(
-    participants.filter(
-      (participant) =>
-        participant.type !== "goalkeeper" && participant.isLateArrival,
-    ),
-  );
-  const regularFieldPlayers = shuffleParticipants(
-    participants.filter(
-      (participant) =>
-        participant.type !== "goalkeeper" && !participant.isLateArrival,
-    ),
-  );
-  const fieldPlayerCount = regularFieldPlayers.length + lateFieldPlayers.length;
-  const teamCount = Math.max(1, Math.ceil(fieldPlayerCount / maxPlayersPerTeam));
-  const teams: DrawTeam[] = Array.from({ length: teamCount }, (_, index) =>
-    createDrawTeam(index),
-  );
-  const lastTeam = teams[teams.length - 1];
-
-  lateFieldPlayers.forEach((player) => {
-    lastTeam.players.push(player);
-  });
-
-  regularFieldPlayers.forEach((player) => {
-    const targetTeam = teams.find((team) => {
-      const fieldPlayersInTeam = team.players.filter(
-        (teamPlayer) => teamPlayer.type !== "goalkeeper",
-      ).length;
-
-      return fieldPlayersInTeam < maxPlayersPerTeam;
-    });
-
-    targetTeam?.players.push(player);
-  });
-
-  goalkeepers.forEach((goalkeeper, index) => {
-    const teamsWithoutGoalkeeper = teams.filter(
-      (team) => !team.players.some((player) => player.type === "goalkeeper"),
-    );
-    const eligibleTeams =
-      teamsWithoutGoalkeeper.length > 0 ? teamsWithoutGoalkeeper : teams;
-    const targetTeam = eligibleTeams[index % eligibleTeams.length];
-
-    targetTeam.players.unshift(goalkeeper);
-  });
-
-  teams.forEach((team) => {
-    team.players = putGoalkeepersFirst(team.players);
-  });
-
-  return teams.filter((team) => team.players.length > 0);
-}function formatTeamsForClipboard(teams: DrawTeam[]) {
+function formatTeamsForClipboard(teams: DrawTeam[]) {
   const lines = ["\u26bd Baba Champion Multi Arena", ""];
 
   teams.forEach((team) => {
@@ -251,7 +170,15 @@ export function TeamDrawPage() {
 
   useEffect(() => {
     let isMounted = true;
-
+    fetchSettings()
+      .then((settings) => {
+        if (isMounted && settings.outfieldPlayersPerTeam > 0) {
+          setMaxPlayersPerTeam(settings.outfieldPlayersPerTeam);
+        }
+      })
+      .catch(() => {
+        // Settings are optional for the draw screen; keep the local/default value.
+      });
     fetchTeamDrawPlayers()
       .then((users) => {
         if (isMounted) {
@@ -260,7 +187,7 @@ export function TeamDrawPage() {
       })
       .catch(() => {
         if (isMounted) {
-          setSnackbarMessage("Não foi possível carregar os jogadores da API.");
+          setSnackbarMessage("Nao foi possivel carregar os jogadores da API.");
         }
       });
 
@@ -278,31 +205,37 @@ export function TeamDrawPage() {
     );
   }, [maxPlayersPerTeam]);
 
-  const addParticipant = (playerId: string) => {
-    const player = registeredPlayers.find(
-      (registeredPlayer) => String(registeredPlayer.id) === playerId,
+  const addParticipant = (playerIds: string[]) => {
+    const participantIds = new Set(
+      participants.map((participant) => String(participant.id)),
+    );
+    const selectedPlayerIds = new Set(playerIds);
+    const playersToAdd = registeredPlayers.filter(
+      (registeredPlayer) =>
+        selectedPlayerIds.has(String(registeredPlayer.id)) &&
+        !participantIds.has(String(registeredPlayer.id)),
     );
 
-    if (!player) {
-      setSnackbarMessage("Selecione um jogador cadastrado.");
-      return false;
+    if (playersToAdd.length === 0) {
+      setSnackbarMessage(
+        "Selecione jogadores cadastrados que ainda nao estejam na lista.",
+      );
+      return 0;
     }
 
-    const isDuplicate = participants.some(
-      (participant) => String(participant.id) === String(player.id),
-    );
-
-    if (isDuplicate) {
-      setSnackbarMessage("Este jogador ja esta na lista.");
-      return false;
-    }
-
-    setParticipants((currentParticipants) => [...currentParticipants, player]);
+    setParticipants((currentParticipants) => [
+      ...currentParticipants,
+      ...playersToAdd,
+    ]);
     setTeams([]);
     setIsDrawModalOpen(false);
-    return true;
+    setSnackbarMessage(
+      playersToAdd.length === 1
+        ? "1 jogador adicionado."
+        : `${playersToAdd.length} jogadores adicionados.`,
+    );
+    return playersToAdd.length;
   };
-
   const addAllMonthlyPlayers = () => {
     const participantIds = new Set(
       participants.map((participant) => String(participant.id)),
@@ -387,25 +320,34 @@ export function TeamDrawPage() {
     setIsDrawModalOpen(false);
   };
 
-  const runDraw = () => {
+  const runDraw = async () => {
     if (participants.length === 0) {
       setSnackbarMessage("Adicione pelo menos um jogador antes de sortear.");
       return;
     }
 
     setIsDrawing(true);
-    window.setTimeout(() => {
-      const generatedTeams = generateTeams(
-        displayParticipants,
-        maxPlayersPerTeam,
-      );
+
+    try {
+      const generatedTeams = await createTeamDraw({
+        eventId: drawEventId,
+        maxOutfieldPlayersPerTeam: maxPlayersPerTeam,
+        participants: displayParticipants,
+      });
+
+      if (generatedTeams.length === 0) {
+        setSnackbarMessage("A API nao retornou times para este sorteio.");
+        return;
+      }
+
       setTeams(generatedTeams);
-      setIsDrawing(false);
       setIsDrawModalOpen(true);
-      setSnackbarMessage(
-        "Sorteio gerado com a quantidade automatica de times.",
-      );
-    }, 700);
+      setSnackbarMessage("Sorteio gerado pela API.");
+    } catch {
+      setSnackbarMessage("Nao foi possivel carregar os jogadores da API.");
+    } finally {
+      setIsDrawing(false);
+    }
   };
 
   const copyTeams = async () => {
@@ -417,7 +359,7 @@ export function TeamDrawPage() {
       return;
     }
 
-    setSnackbarMessage("Não foi possível copiar automaticamente.");
+    setSnackbarMessage("Nao foi possivel copiar automaticamente.");
   };
 
   const shareTeams = async () => {
@@ -557,6 +499,14 @@ export function TeamDrawPage() {
                 maxPlayersPerTeam={maxPlayersPerTeam}
                 onMaxPlayersPerTeamChange={setMaxPlayersPerTeam}
               />
+              <Button
+                component={RouterLink}
+                to="/configuracoes"
+                variant="outlined"
+                startIcon={<SettingsOutlinedIcon />}
+              >
+                Configuracoes
+              </Button>
               {teams.length > 0 ? (
                 <Button
                   variant="outlined"
@@ -688,4 +638,3 @@ export function TeamDrawPage() {
     </Stack>
   );
 }
-
