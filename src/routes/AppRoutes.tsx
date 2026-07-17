@@ -1,11 +1,12 @@
 import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
 import { Box, Button, Container, Stack } from "@mui/material";
 import type { ReactNode } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { useAuth } from "../features/auth/authContext";
 import { LoginPage } from "../pages/LoginPage";
 import { PlayersPage } from "../pages/PlayersPage";
@@ -39,7 +40,8 @@ const navItems = [
 ];
 
 function AppLayout({ children }: { children: ReactNode }) {
-  const { isAdmin, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const { clearSession, isAdmin, isAuthenticated } = useAuth();
   const visibleNavItems = navItems.filter((item) => {
     if (item.authOnly && !isAuthenticated) {
       return false;
@@ -47,6 +49,11 @@ function AppLayout({ children }: { children: ReactNode }) {
 
     return !item.adminOnly || isAdmin;
   });
+
+  const disconnect = () => {
+    clearSession();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#eef5f0" }}>
@@ -81,6 +88,21 @@ function AppLayout({ children }: { children: ReactNode }) {
                 {item.label}
               </Button>
             ))}
+            {isAuthenticated ? (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<LogoutOutlinedIcon />}
+                onClick={disconnect}
+                sx={{
+                  bgcolor: "rgba(255,255,255,0.88)",
+                  flex: { xs: "1 1 140px", sm: "0 0 auto" },
+                  ml: { sm: "auto" },
+                }}
+              >
+                Desconectar
+              </Button>
+            ) : null}
           </Stack>
           {children}
         </Stack>
@@ -92,6 +114,7 @@ function AppLayout({ children }: { children: ReactNode }) {
 function PublicPage({ children }: { children: ReactNode }) {
   return <AppLayout>{children}</AppLayout>;
 }
+
 function ProtectedPage({
   children,
   requireAdmin = false,
@@ -123,9 +146,9 @@ export function AppRoutes() {
       <Route
         path="/sorteio"
         element={
-          <ProtectedPage>
+          <PublicPage>
             <TeamDrawPage />
-          </ProtectedPage>
+          </PublicPage>
         }
       />
       <Route path="/events/draw" element={<Navigate to="/sorteio" replace />} />
