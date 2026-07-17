@@ -1,5 +1,14 @@
 import { apiClient } from '../../services/apiClient'
 
+export type UserRole = 'ADMIN' | 'USER'
+
+export type AuthUser = {
+  id: string | number
+  name: string
+  username: string
+  role: UserRole
+}
+
 export type LoginPayload = {
   username: string
   password: string
@@ -7,6 +16,7 @@ export type LoginPayload = {
 
 type LoginResponse = {
   accessToken: string
+  user: AuthUser
 }
 
 export async function login(payload: LoginPayload) {
@@ -14,4 +24,3 @@ export async function login(payload: LoginPayload) {
 
   return response.data
 }
-

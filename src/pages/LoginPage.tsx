@@ -13,7 +13,7 @@ import {
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { login } from "../features/auth/authApi";
-import { setAccessToken } from "../features/auth/authStorage";
+import { setAuthSession } from "../features/auth/authStorage";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ export function LoginPage() {
 
   const submitLogin = async () => {
     if (!username.trim() || !password) {
-      setErrorMessage("Informe usuario e senha.");
+      setErrorMessage("Informe usuário e senha.");
       return;
     }
 
@@ -45,7 +45,7 @@ export function LoginPage() {
         password,
       });
 
-      setAccessToken(response.accessToken);
+      setAuthSession(response.accessToken, response.user);
       navigate(redirectTo, { replace: true });
     } catch {
       setErrorMessage("Não foi possível autenticar com estes dados.");
@@ -78,7 +78,7 @@ export function LoginPage() {
             ) : null}
             <Stack spacing={2}>
               <TextField
-                label="Usuario"
+                label="Usuário"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 autoComplete="username"

@@ -106,7 +106,7 @@ export function SettingsPage() {
           });
           setPlayerGroups(settingsResult.value.playerGroups ?? []);
         } else if (settingsResult.reason?.response?.status !== 404) {
-          setErrorMessage("Nao foi possivel carregar as configuracoes.");
+          setErrorMessage("Nao foi possivel carregar as configurações.");
         }
 
         if (playersResult.status === "fulfilled") {
@@ -136,7 +136,9 @@ export function SettingsPage() {
   const getAvailablePlayersForGroup = (groupIndex: number) => {
     const usedPlayerIds = usedPlayerIdsByOtherGroups(groupIndex);
 
-    return activePlayers.filter((player) => !usedPlayerIds.has(getPlayerId(player)));
+    return activePlayers.filter(
+      (player) => !usedPlayerIds.has(getPlayerId(player)),
+    );
   };
 
   const updateField = (field: keyof SettingsFormState, value: string) => {
@@ -230,9 +232,9 @@ export function SettingsPage() {
         outfieldPlayersPerTeam: String(savedSettings.outfieldPlayersPerTeam),
       });
       setPlayerGroups(savedSettings.playerGroups ?? []);
-      setMessage("Configuracoes salvas com sucesso.");
+      setMessage("Configurações salvas com sucesso.");
     } catch {
-      setErrorMessage("Nao foi possivel salvar as configuracoes.");
+      setErrorMessage("Nao foi possivel salvar as configurações.");
     } finally {
       setIsSaving(false);
     }
@@ -270,7 +272,7 @@ export function SettingsPage() {
               variant="h1"
               sx={{ color: "inherit", fontSize: { xs: "1.65rem", sm: "2rem" } }}
             >
-              Configuracoes do sorteio
+              Configurações do sorteio
             </Typography>
             <Typography sx={{ color: "rgba(255,255,255,0.72)" }}>
               Ajustes operacionais usados pelo sorteio de times
@@ -359,14 +361,19 @@ export function SettingsPage() {
                   <Typography sx={{ fontWeight: 800 }}>
                     Nenhum agrupamento configurado
                   </Typography>
-                  <Typography color="text.secondary" sx={{ textAlign: "center" }}>
-                    Adicione um grupo quando quiser manter jogadores juntos no sorteio.
+                  <Typography
+                    color="text.secondary"
+                    sx={{ textAlign: "center" }}
+                  >
+                    Adicione um grupo quando quiser manter jogadores juntos no
+                    sorteio.
                   </Typography>
                 </Stack>
               ) : (
                 <Stack spacing={1.5}>
                   {playerGroups.map((group, groupIndex) => {
-                    const availablePlayers = getAvailablePlayersForGroup(groupIndex);
+                    const availablePlayers =
+                      getAvailablePlayersForGroup(groupIndex);
 
                     return (
                       <Paper key={groupIndex} variant="outlined" sx={{ p: 2 }}>
@@ -408,14 +415,23 @@ export function SettingsPage() {
                               }
 
                               return (
-                                <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: "wrap" }}>
+                                <Stack
+                                  direction="row"
+                                  spacing={0.5}
+                                  useFlexGap
+                                  sx={{ flexWrap: "wrap" }}
+                                >
                                   {selectedIds.map((playerId) => {
                                     const player = playerById.get(playerId);
 
                                     return (
                                       <Chip
                                         key={playerId}
-                                        label={player ? getPlayerName(player) : playerId}
+                                        label={
+                                          player
+                                            ? getPlayerName(player)
+                                            : playerId
+                                        }
                                         size="small"
                                       />
                                     );
@@ -436,9 +452,7 @@ export function SettingsPage() {
                                   <Checkbox checked={isSelected} />
                                   <ListItemText
                                     primary={getPlayerName(player)}
-                                    secondary={
-                                      getPlayerTypeLabel(player)
-                                    }
+                                    secondary={getPlayerTypeLabel(player)}
                                   />
                                 </MenuItem>
                               );
@@ -456,13 +470,17 @@ export function SettingsPage() {
               variant="contained"
               size="large"
               startIcon={
-                isSaving ? <CircularProgress color="inherit" size={18} /> : <SaveOutlinedIcon />
+                isSaving ? (
+                  <CircularProgress color="inherit" size={18} />
+                ) : (
+                  <SaveOutlinedIcon />
+                )
               }
               onClick={submitSettings}
               disabled={isSaving}
               sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
             >
-              Salvar configuracoes
+              Salvar configurações
             </Button>
           </Stack>
         )}

@@ -31,10 +31,7 @@ import {
   fetchTeamDrawPlayers,
   mapApiPlayerToDrawParticipant,
 } from "../features/teamDraw/services/usersApi";
-import type {
-  DrawParticipant,
-  DrawTeam,
-} from "../features/teamDraw/types";
+import type { DrawParticipant, DrawTeam } from "../features/teamDraw/types";
 
 const todayEventDate = new Date();
 todayEventDate.setHours(21, 30, 0, 0);
@@ -98,7 +95,9 @@ function formatTeamsForClipboard(teams: DrawTeam[]) {
 
     lines.push(`${marker} ${team.name.toUpperCase()}`);
     team.players.forEach((player) => {
-      lines.push(player.type === "goalkeeper" ? `Goleiro ${player.name}` : player.name);
+      lines.push(
+        player.type === "goalkeeper" ? `Goleiro ${player.name}` : player.name,
+      );
     });
     lines.push("");
   });
@@ -257,9 +256,11 @@ export function TeamDrawPage() {
     ]);
     setTeams([]);
     setIsDrawModalOpen(false);
-    setSnackbarMessage(`${monthlyPlayersToAdd.length} mensalista${
-      monthlyPlayersToAdd.length === 1 ? "" : "s"
-    } adicionado${monthlyPlayersToAdd.length === 1 ? "" : "s"}.`);
+    setSnackbarMessage(
+      `${monthlyPlayersToAdd.length} mensalista${
+        monthlyPlayersToAdd.length === 1 ? "" : "s"
+      } adicionado${monthlyPlayersToAdd.length === 1 ? "" : "s"}.`,
+    );
   };
 
   const importGuests = (guests: ImportedGuest[]) => {
@@ -288,9 +289,11 @@ export function TeamDrawPage() {
     ]);
     setTeams([]);
     setIsDrawModalOpen(false);
-    setSnackbarMessage(`${guestsToAdd.length} convidado${
-      guestsToAdd.length === 1 ? "" : "s"
-    } adicionado${guestsToAdd.length === 1 ? "" : "s"}.`);
+    setSnackbarMessage(
+      `${guestsToAdd.length} convidado${
+        guestsToAdd.length === 1 ? "" : "s"
+      } adicionado${guestsToAdd.length === 1 ? "" : "s"}.`,
+    );
   };
 
   const toggleLateArrival = (participantId: string) => {
@@ -505,7 +508,7 @@ export function TeamDrawPage() {
                 variant="outlined"
                 startIcon={<SettingsOutlinedIcon />}
               >
-                Configuracoes
+                Configurações
               </Button>
               {teams.length > 0 ? (
                 <Button
@@ -607,21 +610,21 @@ export function TeamDrawPage() {
           <Button
             variant="contained"
             size="large"
-          startIcon={
-            isDrawing ? (
-              <CircularProgress color="inherit" size={18} />
-            ) : (
-              <ShuffleOutlinedIcon />
-            )
-          }
-          onClick={runDraw}
-          disabled={isDrawing || participants.length === 0}
-          fullWidth
-        >
-          {isDrawing
-            ? "Sorteando..."
-            : `Sortear ${participants.length} jogadores`}
-        </Button>
+            startIcon={
+              isDrawing ? (
+                <CircularProgress color="inherit" size={18} />
+              ) : (
+                <ShuffleOutlinedIcon />
+              )
+            }
+            onClick={runDraw}
+            disabled={isDrawing || participants.length === 0}
+            fullWidth
+          >
+            {isDrawing
+              ? "Sorteando..."
+              : `Sortear ${participants.length} jogadores`}
+          </Button>
         </Stack>
       </Box>
 

@@ -34,6 +34,7 @@ import {
   type PlayerPosition,
   type PlayerType,
   updatePlayer,
+  updatePlayerStats,
 } from "../features/players/playersApi";
 
 const jerseySizes: JerseySize[] = ["XS", "S", "M", "L", "XL", "XXL"];
@@ -46,6 +47,8 @@ type PlayerFormState = {
   photoUrl: string;
   position: PlayerPosition;
   type: PlayerType;
+  goals: string;
+  assists: string;
 };
 
 const emptyForm: PlayerFormState = {
@@ -56,6 +59,8 @@ const emptyForm: PlayerFormState = {
   photoUrl: "",
   position: "OUTFIELD",
   type: "MEMBER",
+  goals: "0",
+  assists: "0",
 };
 
 function getPlayerPayload(form: PlayerFormState): PlayerPayload {
@@ -79,6 +84,8 @@ function getFormFromPlayer(player: Player): PlayerFormState {
     photoUrl: player.photoUrl ?? "",
     position: player.position,
     type: player.type ?? "MEMBER",
+    goals: String(player.goals),
+    assists: String(player.assists),
   };
 }
 
@@ -109,7 +116,7 @@ function getPlayerSubtitle(player: Player) {
     details.push(`Camisa #${player.jerseyNumber}`);
   }
 
-  return details.join(" · ");
+  return details.join(" - ");
 }
 
 export function PlayersPage() {
@@ -175,6 +182,22 @@ export function PlayersPage() {
       return;
     }
 
+    const goals = Number(form.goals || 0);
+    const assists = Number(form.assists || 0);
+
+    if (
+      editingPlayerId &&
+      (!Number.isInteger(goals) ||
+        !Number.isInteger(assists) ||
+        goals < 0 ||
+        assists < 0)
+    ) {
+      setErrorMessage(
+        "Gols e assistencias devem ser inteiros maiores ou iguais a zero.",
+      );
+      return;
+    }
+
     setIsSaving(true);
     setErrorMessage("");
     setMessage("");
@@ -182,6 +205,10 @@ export function PlayersPage() {
     try {
       if (editingPlayerId) {
         await updatePlayer(editingPlayerId, payload);
+        await updatePlayerStats(editingPlayerId, {
+          goals,
+          assists,
+        });
         setMessage("Jogador atualizado com sucesso.");
       } else {
         await createPlayer(payload);
@@ -196,7 +223,6 @@ export function PlayersPage() {
       setIsSaving(false);
     }
   };
-
   const editPlayer = (player: Player) => {
     setEditingPlayerId(player.id);
     setForm(getFormFromPlayer(player));
@@ -383,6 +409,37 @@ export function PlayersPage() {
               }
               fullWidth
             />
+            {editingPlayerId ? (
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                <TextField
+                  label="Gols"
+                  type="number"
+                  value={form.goals}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      goals: event.target.value,
+                    }))
+                  }
+                  slotProps={{ htmlInput: { min: 0, step: 1 } }}
+                  fullWidth
+                />
+                <TextField
+                  label="Assistencias"
+                  type="number"
+                  value={form.assists}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      assists: event.target.value,
+                    }))
+                  }
+                  slotProps={{ htmlInput: { min: 0, step: 1 } }}
+                  fullWidth
+                />
+              </Stack>
+            ) : null}
+
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <Button
                 variant="contained"
@@ -480,6 +537,18 @@ export function PlayersPage() {
                           label={getPlayerTypeLabel(player)}
                           size="small"
                           color={getPlayerTypeColor(player)}
+                        />
+                        <Chip
+                          label={`${player.goals} gol${player.goals === 1 ? "" : "s"}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip
+                          label={`${player.assists} assist${
+                            player.assists === 1 ? "" : "s"
+                          }`}
+                          size="small"
+                          variant="outlined"
                         />
                         <Chip
                           label={player.isActive ? "Ativo" : "Inativo"}

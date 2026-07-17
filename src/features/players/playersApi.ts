@@ -13,6 +13,8 @@ export type Player = {
   photoUrl?: string | null
   position: PlayerPosition
   type?: PlayerType | null
+  goals: number
+  assists: number
   isActive: boolean
   deactivatedAt?: string | null
 }
@@ -25,6 +27,11 @@ export type PlayerPayload = {
   photoUrl?: string | null
   position: PlayerPosition
   type?: PlayerType | null
+}
+
+export type PlayerStatsPayload = {
+  goals?: number
+  assists?: number
 }
 
 type PlayersResponse = Player[] | { data: Player[] }
@@ -71,6 +78,15 @@ export async function createPlayer(payload: PlayerPayload) {
 
 export async function updatePlayer(playerId: string | number, payload: Partial<PlayerPayload>) {
   const response = await apiClient.patch<Player>(`/players/${playerId}`, payload)
+
+  return response.data
+}
+
+export async function updatePlayerStats(
+  playerId: string | number,
+  payload: PlayerStatsPayload,
+) {
+  const response = await apiClient.patch<Player>(`/players/${playerId}/stats`, payload)
 
   return response.data
 }

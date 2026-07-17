@@ -1,6 +1,6 @@
 ﻿# Meu Baba API
 
-API REST em TypeScript com NestJS, TypeORM, SQLite e autenticacao JWT.
+API REST em TypeScript com NestJS, TypeORM, PostgreSQL/SQLite e autenticacao JWT.
 
 ## Como executar
 
@@ -57,7 +57,8 @@ User representa uma pessoa que acessa o sistema:
     {
       "name": "Gabriel Silva",
       "username": "gabriel",
-      "password": "strong-password"
+      "password": "strong-password",
+      "role": "ADMIN"
     }
 
 Rotas protegidas:
@@ -68,7 +69,7 @@ Rotas protegidas:
 - PATCH /api/users/:id
 - DELETE /api/users/:id
 
-A senha aceita entre 8 e 72 caracteres, sempre e armazenada como hash e nunca aparece nas respostas.
+A senha aceita entre 8 e 72 caracteres, sempre e armazenada como hash e nunca aparece nas respostas. role aceita ADMIN ou USER, aparece nas respostas e tambem e incluido no login e no JWT. Usuarios existentes recebem ADMIN quando a coluna e criada; novos usuarios exigem a escolha do perfil. Nesta etapa, os dois perfis possuem as mesmas permissoes.
 
 ## Player
 
@@ -93,6 +94,7 @@ Rotas protegidas:
 
 - POST /api/players
 - PATCH /api/players/:id
+- PATCH /api/players/:id/stats
 - PATCH /api/players/:id/deactivate
 - PATCH /api/players/:id/activate
 
@@ -114,6 +116,17 @@ Campos opcionais, que tambem aceitam null:
 - photoUrl: URL HTTP ou HTTPS
 
 Na inicializacao, players existentes sao migrados automaticamente: jogadores de linha recebem MEMBER e goleiros recebem null.
+
+Gols e assistencias sao totais acumulados, iniciam em zero e aparecem nas listagens publicas. Para definir um ou ambos os valores:
+
+    PATCH /api/players/:id/stats
+
+    {
+      "goals": 7,
+      "assists": 3
+    }
+
+Os valores devem ser inteiros entre 0 e 1000000. A rota exige autenticacao.
 
 ## Settings
 
@@ -178,8 +191,42 @@ Os resultados ficam persistidos nas tabelas draws, draw_teams e draw_team_player
 
 ## Banco de dados
 
-O SQLite cria automaticamente as tabelas users, players, settings, draws, draw_teams e draw_team_players em data/meu-baba.sqlite.
+Com DATABASE_URL, a API usa PostgreSQL. Sem essa variavel, usa SQLite local em data/meu-baba.sqlite. O TypeORM cria as tabelas users, players, settings, draws, draw_teams e draw_team_players automaticamente.
 
 ## Testes
 
     npm test
+
+## Deploy na Vercel
+
+A aplicacao usa PostgreSQL quando DATABASE_URL esta configurada e mantem SQLite apenas para desenvolvimento e testes locais.
+
+Configure em Project Settings > Environment Variables:
+
+- DATABASE_URL: string de conexao PostgreSQL
+- JWT_SECRET: segredo forte e exclusivo da aplicacao
+- DATABASE_SSL: opcional; use false somente se o provedor PostgreSQL nao aceitar SSL
+
+O arquivo vercel.json executa npm run build. A Vercel detecta src/main.ts como o entrypoint NestJS. Com DATABASE_URL presente, a aplicacao nao tenta criar nem gravar a pasta data.
+
+Na configuracao atual, synchronize esta habilitado para criar as tabelas automaticamente. Antes de evoluir um banco de producao com dados importantes, substitua synchronize por migrations versionadas.
+
+## Migrar players para producao
+
+A migracao le o SQLite local e preserva os UUIDs ao inserir ou atualizar players no PostgreSQL.
+
+Primeiro, execute a simulacao, que nao abre conexao com producao:
+
+    npm run migrate:players
+
+Depois configure a URL do banco Neon apenas na sessao atual do PowerShell e execute a migracao:
+
+    $env:PRODUCTION_DATABASE_URL="postgresql://..."
+    npm run migrate:players -- --execute
+
+Por padrao, a origem e data/meu-baba.sqlite. Para usar outro arquivo:
+
+    $env:SQLITE_DATABASE_PATH="C:/caminho/outro.sqlite"
+    npm run migrate:players
+
+A operacao preserva tambem goals e assists e usa uma transacao unica. Qualquer conflito, inclusive jerseyNumber duplicado em outro UUID, cancela toda a importacao.
