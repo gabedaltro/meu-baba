@@ -1,5 +1,4 @@
 import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import SportsSoccerOutlinedIcon from "@mui/icons-material/SportsSoccerOutlined";
 import {
   Alert,
@@ -16,7 +15,6 @@ import {
 } from "@mui/material";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
 import { fetchSettings } from "../features/settings/settingsApi";
 import { createTeamDraw } from "../features/teamDraw/services/drawsApi";
 import { DrawConfigCard } from "../features/teamDraw/components/DrawConfigCard";
@@ -502,14 +500,6 @@ export function TeamDrawPage() {
                 maxPlayersPerTeam={maxPlayersPerTeam}
                 onMaxPlayersPerTeamChange={setMaxPlayersPerTeam}
               />
-              <Button
-                component={RouterLink}
-                to="/configuracoes"
-                variant="outlined"
-                startIcon={<SettingsOutlinedIcon />}
-              >
-                Configurações
-              </Button>
               {teams.length > 0 ? (
                 <Button
                   variant="outlined"

@@ -24,3 +24,9 @@ export async function login(payload: LoginPayload) {
 
   return response.data
 }
+
+export async function fetchAuthenticatedUser() {
+  const response = await apiClient.get<AuthUser>('/auth/me')
+
+  return response.data
+}

@@ -1,10 +1,11 @@
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
 import { Box, Button, Container, Stack } from "@mui/material";
 import type { ReactNode } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { useAuth } from "../features/auth/authContext";
 import { LoginPage } from "../pages/LoginPage";
 import { PlayersPage } from "../pages/PlayersPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -16,17 +17,23 @@ const navItems = [
   { label: "Sorteio", path: "/sorteio", icon: <ShuffleOutlinedIcon /> },
   { label: "Jogadores", path: "/jogadores", icon: <GroupsOutlinedIcon /> },
   {
-    label: "Usuários",
+    label: "Usuarios",
     path: "/usuarios",
     icon: <ManageAccountsOutlinedIcon />,
+    adminOnly: true,
   },
   {
-    label: "Configurações",
+    label: "Configuracoes",
     path: "/configuracoes",
     icon: <SettingsOutlinedIcon />,
+    adminOnly: true,
   },
 ];
+
 function AppLayout({ children }: { children: ReactNode }) {
+  const { isAdmin } = useAuth();
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#eef5f0" }}>
       <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
@@ -37,7 +44,7 @@ function AppLayout({ children }: { children: ReactNode }) {
             useFlexGap
             sx={{ flexWrap: "wrap" }}
           >
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <Button
                 key={item.path}
                 component={NavLink}
@@ -68,9 +75,15 @@ function AppLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function ProtectedPage({ children }: { children: ReactNode }) {
+function ProtectedPage({
+  children,
+  requireAdmin = false,
+}: {
+  children: ReactNode;
+  requireAdmin?: boolean;
+}) {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requireAdmin={requireAdmin}>
       <AppLayout>{children}</AppLayout>
     </ProtectedRoute>
   );
@@ -102,7 +115,7 @@ export function AppRoutes() {
       <Route
         path="/usuarios"
         element={
-          <ProtectedPage>
+          <ProtectedPage requireAdmin>
             <UsersPage />
           </ProtectedPage>
         }
@@ -111,7 +124,7 @@ export function AppRoutes() {
       <Route
         path="/configuracoes"
         element={
-          <ProtectedPage>
+          <ProtectedPage requireAdmin>
             <SettingsPage />
           </ProtectedPage>
         }

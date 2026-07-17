@@ -13,10 +13,11 @@ import {
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { login } from "../features/auth/authApi";
-import { setAuthSession } from "../features/auth/authStorage";
+import { useAuth } from "../features/auth/authContext";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { setSession } = useAuth();
   const location = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +46,7 @@ export function LoginPage() {
         password,
       });
 
-      setAuthSession(response.accessToken, response.user);
+      setSession(response.accessToken, response.user);
       navigate(redirectTo, { replace: true });
     } catch {
       setErrorMessage("Não foi possível autenticar com estes dados.");
