@@ -67,14 +67,22 @@ function getPositionFromParams(value: string | null): PlayerPosition | null {
 }
 
 function getTypeFromParams(value: string | null): PlayerType | null {
-  return value === "MEMBER" || value === "GUEST" ? value : null;
+  if (value === "ALL") {
+    return null;
+  }
+
+  return value === "GUEST" ? "GUEST" : "MEMBER";
 }
 
 function getLimitFromParams(value: string | null) {
-  const parsedLimit = Number(value ?? 10);
+  if (!value) {
+    return null;
+  }
+
+  const parsedLimit = Number(value);
 
   if (!Number.isInteger(parsedLimit)) {
-    return 10;
+    return null;
   }
 
   return Math.min(100, Math.max(1, parsedLimit));
@@ -341,11 +349,6 @@ export function RankingsPage() {
     } else {
       nextParams.set(key, String(value));
     }
-
-    if (key !== "limit" && filters.limit === 10) {
-      nextParams.delete("limit");
-    }
-
     setSearchParams(nextParams, { replace: true });
   };
 
@@ -528,13 +531,16 @@ export function RankingsPage() {
               }}
             />
             <Select
-              value={filters.type ?? ""}
+              value={filters.type ?? "ALL"}
               displayEmpty
               onChange={(event) =>
-                updateFilter("type", event.target.value || null)
+                updateFilter(
+                  "type",
+                  event.target.value === "MEMBER" ? null : event.target.value,
+                )
               }
             >
-              <MenuItem value="">Todos tipos</MenuItem>
+              <MenuItem value="ALL">Todos tipos</MenuItem>
               <MenuItem value="MEMBER">Mensalistas</MenuItem>
               <MenuItem value="GUEST">Convidados</MenuItem>
             </Select>
@@ -565,13 +571,17 @@ export function RankingsPage() {
             <TextField
               label="Limite"
               type="number"
-              value={filters.limit}
+              value={filters.limit ?? ""}
               onChange={(event) =>
                 updateFilter(
                   "limit",
-                  Math.min(100, Math.max(1, Number(event.target.value || 10))),
+                  event.target.value
+                    ? Math.min(100, Math.max(1, Number(event.target.value)))
+                    : null,
                 )
               }
+              placeholder="Todos"
+              helperText="Vazio exibe todos os jogadores retornados pela API."
               slotProps={{ htmlInput: { min: 1, max: 100 } }}
             />
           </Box>
