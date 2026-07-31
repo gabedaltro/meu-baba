@@ -2,13 +2,15 @@ export type DrawParticipantType = 'monthly_player' | 'goalkeeper' | 'guest'
 
 export type DrawMode = 'random' | 'balanced'
 
-export type DrawArrivalStatus = 'on_time' | 'late'
-
 export type DrawParticipant = {
-  id: number
+  id: string
   name: string
   type: DrawParticipantType
-  arrivalStatus?: DrawArrivalStatus
+  userId?: string
+  nickname?: string
+  jerseyNumber?: number
+  photoUrl?: string
+  isLateArrival?: boolean
   goals?: number
   assists?: number
 }
