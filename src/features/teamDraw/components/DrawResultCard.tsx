@@ -1,10 +1,30 @@
 import SportsSoccerOutlinedIcon from '@mui/icons-material/SportsSoccerOutlined'
+import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined'
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import RemoveOutlinedIcon from '@mui/icons-material/RemoveOutlined'
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined'
 import ScheduleOutlinedIcon from '@mui/icons-material/ScheduleOutlined'
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined'
-import { Avatar, Box, Button, Chip, Stack, Typography } from '@mui/material'
+import {
+  Avatar,
+  Box,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+  useMediaQuery,
+} from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 import { motion } from 'framer-motion'
+import { useMemo, useState } from 'react'
 import type { DrawParticipant, DrawTeam } from '../types'
 
 function getPlayerBadge(player: DrawParticipant) {
@@ -27,6 +47,11 @@ type DrawResultCardProps = {
   onCopy: () => void
   onShare: () => void
   onAssignLateParticipant: (participantId: number) => void
+  onChangePlayerStat: (
+    participantId: number,
+    stat: 'goals' | 'assists',
+    delta: number,
+  ) => void
 }
 
 function getFieldPlayerCount(team: DrawTeam) {
@@ -61,6 +86,92 @@ function getSuggestedTeamName(
   )[0].name
 }
 
+function getPlayerStatsLabel(player: DrawParticipant) {
+  return `G ${player.goals ?? 0} · A ${player.assists ?? 0}`
+}
+
+type PlayerStatControlsProps = {
+  player: DrawParticipant
+  compact?: boolean
+  onChangePlayerStat: (
+    participantId: number,
+    stat: 'goals' | 'assists',
+    delta: number,
+  ) => void
+}
+
+function PlayerStatControls({
+  player,
+  compact = false,
+  onChangePlayerStat,
+}: PlayerStatControlsProps) {
+  const statItems = [
+    { key: 'goals' as const, label: 'Gols', shortLabel: 'G', value: player.goals ?? 0 },
+    { key: 'assists' as const, label: 'Assistências', shortLabel: 'A', value: player.assists ?? 0 },
+  ]
+
+  return (
+    <Stack spacing={compact ? 1 : 1.5}>
+      {statItems.map((item) => (
+        <Stack
+          key={item.key}
+          direction="row"
+          spacing={1}
+          sx={{
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 2,
+            bgcolor: compact ? 'transparent' : 'background.default',
+            px: compact ? 0.75 : 1.5,
+            py: compact ? 0.5 : 1,
+          }}
+        >
+          <Typography sx={{ minWidth: compact ? 18 : 92, fontWeight: 800 }}>
+            {compact ? item.shortLabel : item.label}
+          </Typography>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <Tooltip title={`Remover ${item.label.toLocaleLowerCase('pt-BR')}`}>
+              <span>
+                <IconButton
+                  size={compact ? 'small' : 'medium'}
+                  color="primary"
+                  disabled={item.value === 0}
+                  onClick={() => onChangePlayerStat(player.id, item.key, -1)}
+                  aria-label={`Remover ${item.label.toLocaleLowerCase('pt-BR')} de ${player.name}`}
+                >
+                  <RemoveOutlinedIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Typography
+              sx={{
+                width: compact ? 24 : 36,
+                textAlign: 'center',
+                fontWeight: 900,
+                fontSize: compact ? '1rem' : '1.35rem',
+              }}
+            >
+              {item.value}
+            </Typography>
+            <Tooltip title={`Adicionar ${item.label.toLocaleLowerCase('pt-BR')}`}>
+              <IconButton
+                size={compact ? 'small' : 'medium'}
+                color="primary"
+                onClick={() => onChangePlayerStat(player.id, item.key, 1)}
+                aria-label={`Adicionar ${item.label.toLocaleLowerCase('pt-BR')} para ${player.name}`}
+              >
+                <AddOutlinedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        </Stack>
+      ))}
+    </Stack>
+  )
+}
+
 export function DrawResultCard({
   teams,
   lateParticipants,
@@ -69,7 +180,20 @@ export function DrawResultCard({
   onCopy,
   onShare,
   onAssignLateParticipant,
+  onChangePlayerStat,
 }: DrawResultCardProps) {
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null)
+  const selectedPlayer = useMemo(
+    () =>
+      teams
+        .flatMap((team) => team.players)
+        .find((player) => player.id === selectedPlayerId) ?? null,
+    [selectedPlayerId, teams],
+  )
+  const closeStatsDialog = () => setSelectedPlayerId(null)
+
   return (
     <Box
       component={motion.section}
@@ -89,7 +213,7 @@ export function DrawResultCard({
                 Times em campo
               </Typography>
               <Typography sx={{ color: 'rgba(255,255,255,0.72)' }}>
-                Sorteio concluído
+                Toque no jogador para lançar gols e assistências
               </Typography>
             </Stack>
 
@@ -196,16 +320,54 @@ export function DrawResultCard({
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: teamIndex * 0.09 + playerIndex * 0.045 + 0.15 }}
                           direction="row"
-                          spacing={1}
-                          sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                          spacing={1.25}
+                          onClick={() => {
+                            if (isMobile) {
+                              setSelectedPlayerId(player.id)
+                            }
+                          }}
+                          sx={{
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 2,
+                            bgcolor: '#fff',
+                            p: { xs: 1, sm: 0.75 },
+                            cursor: { xs: 'pointer', sm: 'default' },
+                          }}
                         >
                           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
                             <Avatar sx={{ width: 30, height: 30, bgcolor: `${teamColor}18`, color: teamColor, fontSize: 13, fontWeight: 800 }}>
                               {player.name.charAt(0).toLocaleUpperCase('pt-BR')}
                             </Avatar>
-                            <Typography sx={{ fontWeight: 650 }} noWrap>{player.name}</Typography>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography sx={{ fontWeight: 650 }} noWrap>{player.name}</Typography>
+                              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', mt: 0.25 }}>
+                                {getPlayerBadge(player)}
+                                <Chip
+                                  label={getPlayerStatsLabel(player)}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ height: 20, fontSize: 10, display: { xs: 'inline-flex', sm: 'none' } }}
+                                />
+                              </Stack>
+                            </Box>
                           </Stack>
-                          {getPlayerBadge(player)}
+                          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                            <PlayerStatControls
+                              player={player}
+                              compact
+                              onChangePlayerStat={onChangePlayerStat}
+                            />
+                          </Box>
+                          <IconButton
+                            size="small"
+                            aria-label={`Editar gols e assistências de ${player.name}`}
+                            sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
+                          >
+                            <EditOutlinedIcon fontSize="small" />
+                          </IconButton>
                         </Stack>
                       ))}
                     </Stack>
@@ -297,6 +459,52 @@ export function DrawResultCard({
             </Box>
           ) : null}
         </Stack>
+        <Dialog
+          open={Boolean(selectedPlayer)}
+          onClose={closeStatsDialog}
+          fullWidth
+          maxWidth="xs"
+          slotProps={{
+            paper: {
+              sx: {
+                m: 1.5,
+                borderRadius: 2,
+              },
+            },
+          }}
+        >
+          {selectedPlayer ? (
+            <>
+              <DialogTitle>
+                <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+                  <Avatar sx={{ bgcolor: 'primary.main', color: 'primary.contrastText' }}>
+                    {selectedPlayer.name.charAt(0).toLocaleUpperCase('pt-BR')}
+                  </Avatar>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="h3" noWrap>
+                      {selectedPlayer.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Atualizar gols e assistências
+                    </Typography>
+                  </Box>
+                </Stack>
+              </DialogTitle>
+              <Divider />
+              <DialogContent>
+                <PlayerStatControls
+                  player={selectedPlayer}
+                  onChangePlayerStat={onChangePlayerStat}
+                />
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 3 }}>
+                <Button variant="contained" onClick={closeStatsDialog} fullWidth>
+                  Concluir
+                </Button>
+              </DialogActions>
+            </>
+          ) : null}
+        </Dialog>
     </Box>
   )
 }

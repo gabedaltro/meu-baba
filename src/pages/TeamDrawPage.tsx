@@ -200,7 +200,9 @@ function formatTeamsForClipboard(teams: DrawTeam[]) {
   return lines.join("\n").trim();
 }
 
-function formatLateParticipantsForClipboard(lateParticipants: DrawParticipant[]) {
+function formatLateParticipantsForClipboard(
+  lateParticipants: DrawParticipant[],
+) {
   if (lateParticipants.length === 0) {
     return "";
   }
@@ -209,6 +211,33 @@ function formatLateParticipantsForClipboard(lateParticipants: DrawParticipant[])
     "",
     "⏱️ PARA COMPLETAR",
     ...lateParticipants.map((participant) => participant.name),
+  ].join("\n");
+}
+
+function formatPlayerStatsForClipboard(teams: DrawTeam[]) {
+  const playerStats = teams
+    .flatMap((team) => team.players)
+    .filter((player) => (player.goals ?? 0) > 0 || (player.assists ?? 0) > 0);
+
+  if (playerStats.length === 0) {
+    return "";
+  }
+
+  return [
+    "",
+    "📊 ESTATÍSTICAS",
+    ...playerStats.map((player) => {
+      const stats = [
+        (player.goals ?? 0) > 0
+          ? `${player.goals} gol${player.goals === 1 ? "" : "s"}`
+          : null,
+        (player.assists ?? 0) > 0
+          ? `${player.assists} assistência${player.assists === 1 ? "" : "s"}`
+          : null,
+      ].filter(Boolean);
+
+      return `${player.name}: ${stats.join(" / ")}`;
+    }),
   ].join("\n");
 }
 
@@ -433,7 +462,7 @@ export function TeamDrawPage() {
   };
 
   const getFormattedDrawText = () =>
-    `${formatTeamsForClipboard(teams)}${formatLateParticipantsForClipboard(lateParticipants)}`;
+    `${formatTeamsForClipboard(teams)}${formatLateParticipantsForClipboard(lateParticipants)}${formatPlayerStatsForClipboard(teams)}`;
 
   const copyTeams = async () => {
     const text = getFormattedDrawText();
@@ -444,7 +473,9 @@ export function TeamDrawPage() {
       return;
     }
 
-    setSnackbarMessage("Não foi possível copiar automaticamente neste navegador.");
+    setSnackbarMessage(
+      "Não foi possível copiar automaticamente neste navegador.",
+    );
   };
 
   const shareTeams = async () => {
@@ -516,6 +547,30 @@ export function TeamDrawPage() {
       ),
     );
     setSnackbarMessage(`${participant.name} entrou no ${suggestedTeam.name}.`);
+  };
+
+  const changePlayerStat = (
+    participantId: number,
+    stat: "goals" | "assists",
+    delta: number,
+  ) => {
+    const updatePlayer = (player: DrawParticipant): DrawParticipant =>
+      player.id === participantId
+        ? {
+            ...player,
+            [stat]: Math.max(0, (player[stat] ?? 0) + delta),
+          }
+        : player;
+
+    setParticipants((currentParticipants) =>
+      currentParticipants.map(updatePlayer),
+    );
+    setTeams((currentTeams) =>
+      currentTeams.map((team) => ({
+        ...team,
+        players: team.players.map(updatePlayer),
+      })),
+    );
   };
 
   return (
@@ -691,6 +746,7 @@ export function TeamDrawPage() {
               onCopy={copyTeams}
               onShare={shareTeams}
               onAssignLateParticipant={assignLateParticipant}
+              onChangePlayerStat={changePlayerStat}
             />
           </Box>
         </Box>
@@ -750,5 +806,3 @@ export function TeamDrawPage() {
     </Stack>
   );
 }
-
-

@@ -9,6 +9,8 @@ export type DrawParticipant = {
   name: string
   type: DrawParticipantType
   arrivalStatus?: DrawArrivalStatus
+  goals?: number
+  assists?: number
 }
 
 export type DrawTeam = {
