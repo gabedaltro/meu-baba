@@ -6,7 +6,13 @@ import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
 import { Box, Button, Container, Stack } from "@mui/material";
 import type { ReactNode } from "react";
-import { NavLink, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import {
+  NavLink,
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+} from "react-router-dom";
 import { useAuth } from "../features/auth/authContext";
 import { LoginPage } from "../pages/LoginPage";
 import { PlayersPage } from "../pages/PlayersPage";
@@ -26,13 +32,13 @@ const navItems = [
     authOnly: true,
   },
   {
-    label: "Usuarios",
+    label: "Usuários",
     path: "/usuarios",
     icon: <ManageAccountsOutlinedIcon />,
     adminOnly: true,
   },
   {
-    label: "Configuracoes",
+    label: "Configurações",
     path: "/configuracoes",
     icon: <SettingsOutlinedIcon />,
     adminOnly: true,
@@ -41,7 +47,8 @@ const navItems = [
 
 function AppLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const { clearSession, isAdmin, isAuthenticated, isSessionLoading } = useAuth();
+  const { clearSession, isAdmin, isAuthenticated, isSessionLoading } =
+    useAuth();
   const visibleNavItems = navItems.filter((item) => {
     if (item.authOnly && (!isAuthenticated || isSessionLoading)) {
       return false;

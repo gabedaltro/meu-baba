@@ -82,6 +82,29 @@ function PlayerStatControls({
     { key: 'assists' as const, label: 'Assistências', shortLabel: 'A', value: player.assists ?? 0 },
   ]
 
+  if (compact) {
+    return (
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+        <Button
+          variant={(player.goals ?? 0) > 0 ? 'contained' : 'outlined'}
+          size="small"
+          onClick={() => onChangePlayerStat(player.id, 'goals', 1)}
+          sx={{ minWidth: 66, px: 1, fontSize: 12 }}
+        >
+          + Gol {player.goals ?? 0}
+        </Button>
+        <Button
+          variant={(player.assists ?? 0) > 0 ? 'contained' : 'outlined'}
+          size="small"
+          onClick={() => onChangePlayerStat(player.id, 'assists', 1)}
+          sx={{ minWidth: 78, px: 1, fontSize: 12 }}
+        >
+          + Ass. {player.assists ?? 0}
+        </Button>
+      </Stack>
+    )
+  }
+
   return (
     <Stack spacing={compact ? 1 : 1.5}>
       {statItems.map((item) => (
@@ -141,6 +164,126 @@ function PlayerStatControls({
         </Stack>
       ))}
     </Stack>
+  )
+}
+
+type PlayerStatsDialogProps = {
+  player: DrawParticipant | null
+  onClose: () => void
+  onChangePlayerStat: (
+    participantId: string,
+    stat: 'goals' | 'assists',
+    delta: number,
+  ) => void
+}
+
+function PlayerStatsDialog({
+  player,
+  onClose,
+  onChangePlayerStat,
+}: PlayerStatsDialogProps) {
+  if (!player) {
+    return null
+  }
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      fullWidth
+      maxWidth="xs"
+      slotProps={{
+        paper: {
+          sx: {
+            m: 1.5,
+            borderRadius: 2,
+          },
+        },
+      }}
+    >
+      <DialogTitle>
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+          <Avatar
+            src={player.photoUrl}
+            alt={player.name}
+            sx={{ bgcolor: 'primary.main', color: 'primary.contrastText' }}
+          >
+            {player.name.charAt(0).toLocaleUpperCase('pt-BR')}
+          </Avatar>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h3" noWrap>
+              {getPlayerLabel(player)}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Lance rápido
+            </Typography>
+          </Box>
+        </Stack>
+      </DialogTitle>
+      <Divider />
+      <DialogContent>
+        <Stack spacing={2}>
+          <Stack direction="row" spacing={1}>
+            <Chip
+              label={`${player.goals ?? 0} gol${player.goals === 1 ? '' : 's'}`}
+              color="primary"
+              sx={{ flex: 1, fontWeight: 800 }}
+            />
+            <Chip
+              label={`${player.assists ?? 0} assistência${player.assists === 1 ? '' : 's'}`}
+              color="secondary"
+              sx={{ flex: 1, fontWeight: 800 }}
+            />
+          </Stack>
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<AddOutlinedIcon />}
+            onClick={() => onChangePlayerStat(player.id, 'goals', 1)}
+            fullWidth
+            sx={{ minHeight: 56, fontSize: '1rem' }}
+          >
+            Adicionar gol
+          </Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            size="large"
+            startIcon={<AddOutlinedIcon />}
+            onClick={() => onChangePlayerStat(player.id, 'assists', 1)}
+            fullWidth
+            sx={{ minHeight: 56, fontSize: '1rem' }}
+          >
+            Adicionar assistência
+          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              startIcon={<RemoveOutlinedIcon />}
+              disabled={(player.goals ?? 0) === 0}
+              onClick={() => onChangePlayerStat(player.id, 'goals', -1)}
+              fullWidth
+            >
+              Remover gol
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<RemoveOutlinedIcon />}
+              disabled={(player.assists ?? 0) === 0}
+              onClick={() => onChangePlayerStat(player.id, 'assists', -1)}
+              fullWidth
+            >
+              Remover assistência
+            </Button>
+          </Stack>
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button variant="contained" onClick={onClose} fullWidth>
+          Concluir
+        </Button>
+      </DialogActions>
+    </Dialog>
   )
 }
 
@@ -409,56 +552,11 @@ export function DrawResultCard({
         </Box>
       </Stack>
 
-      <Dialog
-        open={Boolean(selectedPlayer)}
+      <PlayerStatsDialog
+        player={selectedPlayer}
         onClose={closeStatsDialog}
-        fullWidth
-        maxWidth="xs"
-        slotProps={{
-          paper: {
-            sx: {
-              m: 1.5,
-              borderRadius: 2,
-            },
-          },
-        }}
-      >
-        {selectedPlayer ? (
-          <>
-            <DialogTitle>
-              <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
-                <Avatar
-                  src={selectedPlayer.photoUrl}
-                  alt={selectedPlayer.name}
-                  sx={{ bgcolor: 'primary.main', color: 'primary.contrastText' }}
-                >
-                  {selectedPlayer.name.charAt(0).toLocaleUpperCase('pt-BR')}
-                </Avatar>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography variant="h3" noWrap>
-                    {getPlayerLabel(selectedPlayer)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Atualizar gols e assistências
-                  </Typography>
-                </Box>
-              </Stack>
-            </DialogTitle>
-            <Divider />
-            <DialogContent>
-              <PlayerStatControls
-                player={selectedPlayer}
-                onChangePlayerStat={onChangePlayerStat}
-              />
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 3 }}>
-              <Button variant="contained" onClick={closeStatsDialog} fullWidth>
-                Concluir
-              </Button>
-            </DialogActions>
-          </>
-        ) : null}
-      </Dialog>
+        onChangePlayerStat={onChangePlayerStat}
+      />
     </Box>
   )
 }

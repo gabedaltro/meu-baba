@@ -110,13 +110,13 @@ export function SettingsPage() {
           });
           setPlayerGroups(settingsResult.value.playerGroups ?? []);
         } else if (settingsResult.reason?.response?.status !== 404) {
-          setErrorMessage("Nao foi possivel carregar as configurações.");
+          setErrorMessage("Não foi possível carregar as configurações.");
         }
 
         if (playersResult.status === "fulfilled") {
           setPlayers(playersResult.value);
         } else {
-          setErrorMessage("Nao foi possivel carregar os jogadores.");
+          setErrorMessage("Não foi possível carregar os jogadores.");
         }
       })
       .finally(() => {
@@ -191,7 +191,7 @@ export function SettingsPage() {
 
       for (const playerId of group.playerIds) {
         if (seenPlayerIds.has(playerId)) {
-          return "Um jogador nao pode aparecer em mais de um agrupamento.";
+          return "Um jogador não pode aparecer em mais de um agrupamento.";
         }
 
         seenPlayerIds.add(playerId);
@@ -243,7 +243,7 @@ export function SettingsPage() {
       setPlayerGroups(savedSettings.playerGroups ?? []);
       setMessage("Configurações salvas com sucesso.");
     } catch {
-      setErrorMessage("Nao foi possivel salvar as configurações.");
+      setErrorMessage("Não foi possível salvar as configurações.");
     } finally {
       setIsSaving(false);
     }

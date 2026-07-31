@@ -25,7 +25,9 @@ import {
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
@@ -141,11 +143,14 @@ function getPlayerSubtitle(player: Player) {
 }
 
 export function PlayersPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [players, setPlayers] = useState<Player[]>([]);
   const [form, setForm] = useState<PlayerFormState>(emptyForm);
   const [editingPlayerId, setEditingPlayerId] = useState<
     string | number | null
   >(null);
+  const [isPlayerFormDialogOpen, setIsPlayerFormDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [statsPlayer, setStatsPlayer] = useState<Player | null>(null);
@@ -164,7 +169,7 @@ export function PlayersPage() {
     try {
       setPlayers(await fetchPlayers());
     } catch {
-      setErrorMessage("Nao foi possivel carregar os jogadores.");
+      setErrorMessage("Não foi possível carregar os jogadores.");
     } finally {
       setIsLoading(false);
     }
@@ -181,7 +186,7 @@ export function PlayersPage() {
       })
       .catch(() => {
         if (isMounted) {
-          setErrorMessage("Nao foi possivel carregar os jogadores.");
+          setErrorMessage("Não foi possível carregar os jogadores.");
         }
       })
       .finally(() => {
@@ -198,6 +203,7 @@ export function PlayersPage() {
   const resetForm = () => {
     setForm(emptyForm);
     setEditingPlayerId(null);
+    setIsPlayerFormDialogOpen(false);
   };
 
   const savePlayer = async () => {
@@ -244,7 +250,7 @@ export function PlayersPage() {
       resetForm();
       await loadPlayers();
     } catch {
-      setErrorMessage("Nao foi possivel salvar o jogador.");
+      setErrorMessage("Não foi possível salvar o jogador.");
     } finally {
       setIsSaving(false);
     }
@@ -254,6 +260,10 @@ export function PlayersPage() {
     setForm(getFormFromPlayer(player));
     setMessage("");
     setErrorMessage("");
+
+    if (isMobile) {
+      setIsPlayerFormDialogOpen(true);
+    }
   };
 
   const openStatsDialog = (player: Player) => {
@@ -385,7 +395,7 @@ export function PlayersPage() {
       setStatsPlayer(null);
       setStatsForm(emptyStatsForm);
     } catch {
-      setStatsErrorMessage("Nao foi possivel salvar as estatisticas.");
+      setStatsErrorMessage("Não foi possível salvar as estatisticas.");
     } finally {
       setIsSavingStats(false);
     }
@@ -405,9 +415,171 @@ export function PlayersPage() {
 
       await loadPlayers();
     } catch {
-      setErrorMessage("Nao foi possivel alterar o status do jogador.");
+      setErrorMessage("Não foi possível alterar o status do jogador.");
     }
   };
+
+  const renderPlayerForm = () => (
+    <Stack spacing={2} sx={{ minWidth: 0 }}>
+      <Typography variant="h2">
+        {editingPlayerId ? "Editar jogador" : "Novo jogador"}
+      </Typography>
+      <TextField
+        label="Nome"
+        value={form.name}
+        onChange={(event) =>
+          setForm((current) => ({ ...current, name: event.target.value }))
+        }
+        fullWidth
+      />
+      <TextField
+        label="Apelido"
+        value={form.nickname}
+        onChange={(event) =>
+          setForm((current) => ({
+            ...current,
+            nickname: event.target.value,
+          }))
+        }
+        fullWidth
+      />
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+        <TextField
+          label="Número"
+          type="number"
+          value={form.jerseyNumber}
+          onChange={(event) =>
+            setForm((current) => ({
+              ...current,
+              jerseyNumber: event.target.value,
+            }))
+          }
+          slotProps={{ htmlInput: { min: 1, max: 999 } }}
+          fullWidth
+        />
+        <Select
+          value={form.jerseySize}
+          onChange={(event) =>
+            setForm((current) => ({
+              ...current,
+              jerseySize: event.target.value as PlayerFormState["jerseySize"],
+            }))
+          }
+          displayEmpty
+          fullWidth
+        >
+          <MenuItem value="">Tamanho</MenuItem>
+          {jerseySizes.map((size) => (
+            <MenuItem key={size} value={size}>
+              {size}
+            </MenuItem>
+          ))}
+        </Select>
+      </Stack>
+      <Select
+        value={form.position}
+        onChange={(event) =>
+          setForm((current) => ({
+            ...current,
+            position: event.target.value as PlayerPosition,
+          }))
+        }
+        fullWidth
+      >
+        <MenuItem value="OUTFIELD">Linha</MenuItem>
+        <MenuItem value="GOALKEEPER">Goleiro</MenuItem>
+      </Select>
+      <Select
+        value={form.type}
+        onChange={(event) =>
+          setForm((current) => ({
+            ...current,
+            type: event.target.value as PlayerType,
+          }))
+        }
+        disabled={form.position === "GOALKEEPER"}
+        fullWidth
+      >
+        <MenuItem value="MEMBER">Mensalista</MenuItem>
+        <MenuItem value="GUEST">Convidado</MenuItem>
+      </Select>
+      <TextField
+        label="URL da foto"
+        value={form.photoUrl}
+        onChange={(event) =>
+          setForm((current) => ({
+            ...current,
+            photoUrl: event.target.value,
+          }))
+        }
+        fullWidth
+        sx={{ minWidth: 0 }}
+        slotProps={{
+          htmlInput: {
+            style: {
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            },
+          },
+        }}
+      />
+      {editingPlayerId ? (
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <TextField
+            label="Gols"
+            type="number"
+            value={form.goals}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                goals: event.target.value,
+              }))
+            }
+            slotProps={{ htmlInput: { min: 0, step: 1 } }}
+            fullWidth
+          />
+          <TextField
+            label="Assistências"
+            type="number"
+            value={form.assists}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                assists: event.target.value,
+              }))
+            }
+            slotProps={{ htmlInput: { min: 0, step: 1 } }}
+            fullWidth
+          />
+        </Stack>
+      ) : null}
+
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+        <Button
+          variant="contained"
+          startIcon={
+            isSaving ? (
+              <CircularProgress color="inherit" size={18} />
+            ) : editingPlayerId ? (
+              <SaveOutlinedIcon />
+            ) : (
+              <AddOutlinedIcon />
+            )
+          }
+          onClick={savePlayer}
+          disabled={isSaving}
+          fullWidth
+        >
+          {editingPlayerId ? "Salvar" : "Cadastrar"}
+        </Button>
+        {editingPlayerId ? (
+          <Button variant="outlined" onClick={resetForm} fullWidth>
+            Cancelar
+          </Button>
+        ) : null}
+      </Stack>
+    </Stack>
+  );
 
   return (
     <Stack spacing={{ xs: 2.5, md: 4 }} sx={{ pb: 4 }}>
@@ -453,7 +625,11 @@ export function PlayersPage() {
             to="/sorteio"
             variant="outlined"
             startIcon={<ArrowBackOutlinedIcon />}
-            sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.55)" }}
+            sx={{
+              color: "#fff",
+              borderColor: "rgba(255,255,255,0.55)",
+              width: { xs: "100%", sm: "auto" },
+            }}
           >
             Ir para sorteio
           </Button>
@@ -472,162 +648,20 @@ export function PlayersPage() {
       >
         <Paper
           variant="outlined"
-          sx={{ p: { xs: 2, sm: 3 }, height: "fit-content" }}
+          sx={{
+            display: { xs: editingPlayerId ? "none" : "block", sm: "block" },
+            p: { xs: 2, sm: 3 },
+            height: "fit-content",
+            minWidth: 0,
+          }}
         >
-          <Stack spacing={2}>
-            <Typography variant="h2">
-              {editingPlayerId ? "Editar jogador" : "Novo jogador"}
-            </Typography>
-            <TextField
-              label="Nome"
-              value={form.name}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, name: event.target.value }))
-              }
-              fullWidth
-            />
-            <TextField
-              label="Apelido"
-              value={form.nickname}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  nickname: event.target.value,
-                }))
-              }
-              fullWidth
-            />
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <TextField
-                label="Numero"
-                type="number"
-                value={form.jerseyNumber}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    jerseyNumber: event.target.value,
-                  }))
-                }
-                slotProps={{ htmlInput: { min: 1, max: 999 } }}
-                fullWidth
-              />
-              <Select
-                value={form.jerseySize}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    jerseySize: event.target
-                      .value as PlayerFormState["jerseySize"],
-                  }))
-                }
-                displayEmpty
-                fullWidth
-              >
-                <MenuItem value="">Tamanho</MenuItem>
-                {jerseySizes.map((size) => (
-                  <MenuItem key={size} value={size}>
-                    {size}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Stack>
-            <Select
-              value={form.position}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  position: event.target.value as PlayerPosition,
-                }))
-              }
-              fullWidth
-            >
-              <MenuItem value="OUTFIELD">Linha</MenuItem>
-              <MenuItem value="GOALKEEPER">Goleiro</MenuItem>
-            </Select>
-            <Select
-              value={form.type}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  type: event.target.value as PlayerType,
-                }))
-              }
-              disabled={form.position === "GOALKEEPER"}
-              fullWidth
-            >
-              <MenuItem value="MEMBER">Mensalista</MenuItem>
-              <MenuItem value="GUEST">Convidado</MenuItem>
-            </Select>
-            <TextField
-              label="URL da foto"
-              value={form.photoUrl}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  photoUrl: event.target.value,
-                }))
-              }
-              fullWidth
-            />
-            {editingPlayerId ? (
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                <TextField
-                  label="Gols"
-                  type="number"
-                  value={form.goals}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      goals: event.target.value,
-                    }))
-                  }
-                  slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                  fullWidth
-                />
-                <TextField
-                  label="Assistências"
-                  type="number"
-                  value={form.assists}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      assists: event.target.value,
-                    }))
-                  }
-                  slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                  fullWidth
-                />
-              </Stack>
-            ) : null}
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              <Button
-                variant="contained"
-                startIcon={
-                  isSaving ? (
-                    <CircularProgress color="inherit" size={18} />
-                  ) : editingPlayerId ? (
-                    <SaveOutlinedIcon />
-                  ) : (
-                    <AddOutlinedIcon />
-                  )
-                }
-                onClick={savePlayer}
-                disabled={isSaving}
-                fullWidth
-              >
-                {editingPlayerId ? "Salvar" : "Cadastrar"}
-              </Button>
-              {editingPlayerId ? (
-                <Button variant="outlined" onClick={resetForm} fullWidth>
-                  Cancelar
-                </Button>
-              ) : null}
-            </Stack>
-          </Stack>
+          {renderPlayerForm()}
         </Paper>
 
-        <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+        <Paper
+          variant="outlined"
+          sx={{ p: { xs: 1.5, sm: 3 }, minWidth: 0, overflow: "hidden" }}
+        >
           <Stack spacing={2}>
             <Typography variant="h2">Jogadores cadastrados</Typography>
             {isLoading ? (
@@ -652,10 +686,10 @@ export function PlayersPage() {
                 {players.map((player) => (
                   <Stack
                     key={player.id}
-                    direction="row"
-                    spacing={1}
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={{ xs: 1.25, sm: 1 }}
                     sx={{
-                      alignItems: "center",
+                      alignItems: { xs: "stretch", sm: "center" },
                       border: "1px solid",
                       borderColor: player.isActive
                         ? "divider"
@@ -665,98 +699,121 @@ export function PlayersPage() {
                         ? "#f7faf8"
                         : "rgba(211, 47, 47, 0.04)",
                       p: 1,
+                      minWidth: 0,
                     }}
                   >
-                    <Avatar
-                      src={player.photoUrl ?? undefined}
-                      alt={player.name}
-                      sx={{ width: 40, height: 40 }}
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ alignItems: "center", minWidth: 0 }}
                     >
-                      {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
-                    </Avatar>
-                    <Stack sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 800 }}
-                        noWrap
+                      <Avatar
+                        src={player.photoUrl ?? undefined}
+                        alt={player.name}
+                        sx={{ width: 40, height: 40, flex: "0 0 auto" }}
                       >
-                        {player.name}
-                      </Typography>
-                      {getPlayerSubtitle(player) ? (
+                        {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
+                      </Avatar>
+                      <Stack sx={{ flex: 1, minWidth: 0 }}>
                         <Typography
-                          variant="caption"
-                          color="text.secondary"
+                          variant="body2"
+                          sx={{ fontWeight: 800 }}
                           noWrap
                         >
-                          {getPlayerSubtitle(player)}
+                          {player.name}
                         </Typography>
-                      ) : null}
-                      <Stack
-                        direction="row"
-                        spacing={0.75}
-                        useFlexGap
-                        sx={{ flexWrap: "wrap", mt: 0.5 }}
-                      >
-                        <Chip
-                          label={getPlayerTypeLabel(player)}
-                          size="small"
-                          color={getPlayerTypeColor(player)}
-                        />
-                        <Chip
-                          label={`${player.goals} gol${player.goals === 1 ? "" : "s"}`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={`${player.assists} assist${
-                            player.assists === 1 ? "" : "s"
-                          }`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={player.isActive ? "Ativo" : "Inativo"}
-                          size="small"
-                          color={player.isActive ? "success" : "error"}
-                          variant="outlined"
-                        />
+                        {getPlayerSubtitle(player) ? (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            noWrap
+                          >
+                            {getPlayerSubtitle(player)}
+                          </Typography>
+                        ) : null}
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          useFlexGap
+                          sx={{ flexWrap: "wrap", mt: 0.5 }}
+                        >
+                          <Chip
+                            label={getPlayerTypeLabel(player)}
+                            size="small"
+                            color={getPlayerTypeColor(player)}
+                          />
+                          <Chip
+                            label={`${player.goals} gol${player.goals === 1 ? "" : "s"}`}
+                            size="small"
+                            variant="outlined"
+                          />
+                          <Chip
+                            label={`${player.assists} assist${
+                              player.assists === 1 ? "" : "s"
+                            }`}
+                            size="small"
+                            variant="outlined"
+                          />
+                          <Chip
+                            label={player.isActive ? "Ativo" : "Inativo"}
+                            size="small"
+                            color={player.isActive ? "success" : "error"}
+                            variant="outlined"
+                          />
+                        </Stack>
                       </Stack>
                     </Stack>
-                    <Tooltip title="Atualizar estatisticas">
-                      <IconButton
-                        color="primary"
-                        onClick={() => openStatsDialog(player)}
-                        aria-label={`Atualizar gols e assistências de ${player.name}`}
-                      >
-                        <SportsSoccerOutlinedIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Editar jogador">
-                      <IconButton
-                        onClick={() => editPlayer(player)}
-                        aria-label={`Editar ${player.name}`}
-                      >
-                        <EditOutlinedIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip
-                      title={
-                        player.isActive
-                          ? "Inativar jogador"
-                          : "Reativar jogador"
-                      }
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      sx={{
+                        justifyContent: { xs: "space-between", sm: "flex-end" },
+                        borderTop: { xs: "1px solid", sm: 0 },
+                        borderColor: "divider",
+                        pt: { xs: 1, sm: 0 },
+                        ml: { sm: "auto" },
+                        flex: { xs: "none", sm: "0 0 auto" },
+                      }}
                     >
-                      <IconButton
-                        color={player.isActive ? "warning" : "success"}
-                        onClick={() => void togglePlayerStatus(player)}
+                      <Tooltip title="Atualizar estatísticas">
+                        <IconButton
+                          color="primary"
+                          onClick={() => openStatsDialog(player)}
+                          aria-label={`Atualizar gols e assistências de ${player.name}`}
+                          sx={{ flex: { xs: 1, sm: "initial" } }}
+                        >
+                          <SportsSoccerOutlinedIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Editar jogador">
+                        <IconButton
+                          onClick={() => editPlayer(player)}
+                          aria-label={`Editar ${player.name}`}
+                          sx={{ flex: { xs: 1, sm: "initial" } }}
+                        >
+                          <EditOutlinedIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          player.isActive
+                            ? "Inativar jogador"
+                            : "Reativar jogador"
+                        }
                       >
-                        {player.isActive ? (
-                          <PauseCircleOutlineOutlinedIcon />
-                        ) : (
-                          <PlayCircleOutlineOutlinedIcon />
-                        )}
-                      </IconButton>
-                    </Tooltip>
+                        <IconButton
+                          color={player.isActive ? "warning" : "success"}
+                          onClick={() => void togglePlayerStatus(player)}
+                          sx={{ flex: { xs: 1, sm: "initial" } }}
+                        >
+                          {player.isActive ? (
+                            <PauseCircleOutlineOutlinedIcon />
+                          ) : (
+                            <PlayCircleOutlineOutlinedIcon />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   </Stack>
                 ))}
               </Box>
@@ -765,13 +822,41 @@ export function PlayersPage() {
         </Paper>
       </Box>
       <Dialog
+        open={isPlayerFormDialogOpen}
+        onClose={resetForm}
+        fullWidth
+        maxWidth="sm"
+        slotProps={{
+          paper: {
+            sx: {
+              m: 1,
+              width: "calc(100% - 16px)",
+              maxHeight: "calc(100dvh - 16px)",
+            },
+          },
+        }}
+      >
+        <DialogContent sx={{ p: { xs: 2, sm: 3 }, overflowX: "hidden" }}>
+          {renderPlayerForm()}
+        </DialogContent>
+      </Dialog>
+      <Dialog
         open={Boolean(statsPlayer)}
         onClose={closeStatsDialog}
         fullWidth
         maxWidth="sm"
+        slotProps={{
+          paper: {
+            sx: {
+              m: { xs: 1, sm: 4 },
+              width: { xs: "calc(100% - 16px)", sm: "calc(100% - 64px)" },
+              maxHeight: { xs: "calc(100dvh - 16px)", sm: "calc(100% - 64px)" },
+            },
+          },
+        }}
       >
-        <DialogTitle>Atualizar estatisticas</DialogTitle>
-        <DialogContent>
+        <DialogTitle>Atualizar estatísticas</DialogTitle>
+        <DialogContent sx={{ px: { xs: 2, sm: 3 }, overflowX: "hidden" }}>
           {statsPlayer ? (
             <Stack spacing={2.25} sx={{ pt: 1 }}>
               <Stack
@@ -905,14 +990,26 @@ export function PlayersPage() {
             </Stack>
           ) : null}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={closeStatsDialog} disabled={isSavingStats}>
+        <DialogActions
+          sx={{
+            px: { xs: 2, sm: 3 },
+            pb: 2.5,
+            flexDirection: { xs: "column-reverse", sm: "row" },
+            alignItems: "stretch",
+            "& > :not(style) ~ :not(style)": {
+              ml: { xs: 0, sm: 1 },
+              mb: { xs: 1, sm: 0 },
+            },
+          }}
+        >
+          <Button onClick={closeStatsDialog} disabled={isSavingStats} fullWidth>
             Cancelar
           </Button>
           <Button
             variant="contained"
             onClick={() => void saveStats()}
             disabled={isSavingStats}
+            fullWidth
             startIcon={
               isSavingStats ? (
                 <CircularProgress color="inherit" size={18} />
