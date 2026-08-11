@@ -48,7 +48,7 @@ function getPlayerTypeOrder(player: Player) {
   return player.type === 'GUEST' ? 2 : 1
 }
 
-function sortPlayers(players: Player[]) {
+export function sortPlayers(players: Player[]) {
   return [...players].sort((firstPlayer, secondPlayer) => {
     if (firstPlayer.isActive !== secondPlayer.isActive) {
       return firstPlayer.isActive ? -1 : 1

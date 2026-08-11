@@ -1,4 +1,4 @@
-import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
+﻿import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
 import SportsSoccerOutlinedIcon from "@mui/icons-material/SportsSoccerOutlined";
 import {
   Alert,
@@ -21,6 +21,7 @@ import { createTeamDraw } from "../features/teamDraw/services/drawsApi";
 import { DrawConfigCard } from "../features/teamDraw/components/DrawConfigCard";
 import { DrawMatchModal } from "../features/teamDraw/components/DrawMatchModal";
 import { DrawResultCard } from "../features/teamDraw/components/DrawResultCard";
+import { GoalkeeperParticipantsDialog } from "../features/teamDraw/components/GoalkeeperParticipantsDialog";
 import {
   GuestParticipantsDialog,
   type ImportedGuest,
@@ -126,7 +127,10 @@ function generateLocalTeams(
     ),
   );
   const fieldPlayerCount = regularFieldPlayers.length + lateFieldPlayers.length;
-  const teamCount = Math.max(1, Math.ceil(fieldPlayerCount / safeMaxPlayersPerTeam));
+  const teamCount = Math.max(
+    1,
+    Math.ceil(fieldPlayerCount / safeMaxPlayersPerTeam),
+  );
   const teams = Array.from({ length: teamCount }, (_, index) =>
     createLocalDrawTeam(index),
   );
@@ -152,7 +156,8 @@ function generateLocalTeams(
     const teamsWithoutGoalkeeper = teams.filter(
       (team) => !team.players.some((player) => player.type === "goalkeeper"),
     );
-    const eligibleTeams = teamsWithoutGoalkeeper.length > 0 ? teamsWithoutGoalkeeper : teams;
+    const eligibleTeams =
+      teamsWithoutGoalkeeper.length > 0 ? teamsWithoutGoalkeeper : teams;
     const targetTeam = eligibleTeams[index % eligibleTeams.length];
 
     targetTeam.players.unshift(goalkeeper);
@@ -162,8 +167,27 @@ function generateLocalTeams(
     .map((team) => ({ ...team, players: putGoalkeepersFirst(team.players) }))
     .filter((team) => team.players.length > 0);
 }
-function formatTeamsForClipboard(teams: DrawTeam[]) {
+function getClipboardPlayerName(player: DrawParticipant) {
+  return player.nickname || player.name;
+}
+
+function formatTeamsForClipboard(
+  teams: DrawTeam[],
+  kickoffTeamId: number | null,
+) {
   const lines = ["\u26bd Baba Champion Multi Arena", ""];
+
+  const teamOne = teams[0];
+  const teamTwo = teams[1];
+
+  if (teamOne && teamTwo && kickoffTeamId != null) {
+    const kickoffTeam = teamOne.id === kickoffTeamId ? teamOne : teamTwo;
+    const sideTeam = teamOne.id === kickoffTeamId ? teamTwo : teamOne;
+
+    lines.push(`${kickoffTeam.name} começa com a bola`);
+    lines.push(`${sideTeam.name} escolhe o campo`);
+    lines.push("");
+  }
 
   teams.forEach((team) => {
     const marker =
@@ -179,8 +203,10 @@ function formatTeamsForClipboard(teams: DrawTeam[]) {
 
     lines.push(`${marker} ${team.name.toUpperCase()}`);
     team.players.forEach((player) => {
+      const displayName = getClipboardPlayerName(player);
+
       lines.push(
-        player.type === "goalkeeper" ? `Goleiro ${player.name}` : player.name,
+        player.type === "goalkeeper" ? `Goleiro ${displayName}` : displayName,
       );
     });
     lines.push("");
@@ -230,6 +256,8 @@ export function TeamDrawPage() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [isDrawModalOpen, setIsDrawModalOpen] = useState(false);
   const [isGuestDialogOpen, setIsGuestDialogOpen] = useState(false);
+  const [isGoalkeeperDialogOpen, setIsGoalkeeperDialogOpen] = useState(false);
+  const [kickoffTeamId, setKickoffTeamId] = useState<number | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState("");
 
   const summary = useMemo(() => {
@@ -351,36 +379,82 @@ export function TeamDrawPage() {
     );
   };
 
-  const importGuests = (guests: ImportedGuest[]) => {
+  const importGoalkeepers = (selectedPlayers: DrawParticipant[]) => {
+    const existingIds = new Set(
+      participants.map((participant) => String(participant.id)),
+    );
+    const goalkeepersToAdd = selectedPlayers.filter(
+      (player) => !existingIds.has(String(player.id)),
+    );
+
+    if (goalkeepersToAdd.length === 0) {
+      setSnackbarMessage("Nenhum goleiro novo para adicionar.");
+      return;
+    }
+
+    setParticipants((currentParticipants) => [
+      ...currentParticipants,
+      ...goalkeepersToAdd,
+    ]);
+    setTeams([]);
+    setIsDrawModalOpen(false);
+    setSnackbarMessage(
+      `${goalkeepersToAdd.length} goleiro${
+        goalkeepersToAdd.length === 1 ? "" : "s"
+      } adicionado${goalkeepersToAdd.length === 1 ? "" : "s"}.`,
+    );
+  };
+
+  const importGuests = (
+    selectedPlayers: DrawParticipant[],
+    typedGuests: ImportedGuest[],
+  ) => {
+    const existingIds = new Set(
+      participants.map((participant) => String(participant.id)),
+    );
     const existingNames = new Set(
       participants.map((participant) =>
         normalizeParticipantName(participant.name),
       ),
     );
     const guestTimestamp = Date.now();
-    const guestsToAdd = guests.filter(
-      (guest) => !existingNames.has(normalizeParticipantName(guest.name)),
+
+    const playersToAdd = selectedPlayers.filter(
+      (player) => !existingIds.has(String(player.id)),
+    );
+    const playerNames = new Set(
+      playersToAdd.map((player) => normalizeParticipantName(player.name)),
+    );
+    const typedGuestsToAdd = typedGuests.filter(
+      (guest) =>
+        !existingNames.has(normalizeParticipantName(guest.name)) &&
+        !playerNames.has(normalizeParticipantName(guest.name)),
     );
 
-    if (guestsToAdd.length === 0) {
+    const newParticipants: DrawParticipant[] = [
+      ...playersToAdd,
+      ...typedGuestsToAdd.map((guest, index) => ({
+        id: `guest-${guestTimestamp}-${index}`,
+        name: guest.name,
+        type: "guest" as const,
+      })),
+    ];
+
+    if (newParticipants.length === 0) {
       setSnackbarMessage("Nenhum convidado novo para adicionar.");
       return;
     }
 
     setParticipants((currentParticipants) => [
       ...currentParticipants,
-      ...guestsToAdd.map((guest, index) => ({
-        id: `guest-${guestTimestamp}-${index}`,
-        name: guest.name,
-        type: "guest" as const,
-      })),
+      ...newParticipants,
     ]);
     setTeams([]);
     setIsDrawModalOpen(false);
     setSnackbarMessage(
-      `${guestsToAdd.length} convidado${
-        guestsToAdd.length === 1 ? "" : "s"
-      } adicionado${guestsToAdd.length === 1 ? "" : "s"}.`,
+      `${newParticipants.length} convidado${
+        newParticipants.length === 1 ? "" : "s"
+      } adicionado${newParticipants.length === 1 ? "" : "s"}.`,
     );
   };
 
@@ -434,6 +508,11 @@ export function TeamDrawPage() {
       }
 
       setTeams(generatedTeams);
+      setKickoffTeamId(
+        generatedTeams.length >= 2
+          ? generatedTeams[Math.random() < 0.5 ? 0 : 1].id
+          : null,
+      );
       setIsDrawModalOpen(true);
       setSnackbarMessage(
         isAuthenticated ? "Sorteio gerado pela API." : "Sorteio gerado.",
@@ -446,7 +525,7 @@ export function TeamDrawPage() {
   };
 
   const copyTeams = async () => {
-    const text = formatTeamsForClipboard(displayTeams);
+    const text = formatTeamsForClipboard(displayTeams, kickoffTeamId);
     const didCopy = await copyTextToClipboard(text);
 
     if (didCopy) {
@@ -458,7 +537,7 @@ export function TeamDrawPage() {
   };
 
   const shareTeams = async () => {
-    const text = formatTeamsForClipboard(displayTeams);
+    const text = formatTeamsForClipboard(displayTeams, kickoffTeamId);
 
     if (navigator.share) {
       try {
@@ -532,7 +611,7 @@ export function TeamDrawPage() {
             </Typography>
             <Typography sx={{ color: "rgba(255,255,255,0.72)" }}>
               {summary.totalPeople === 0
-                ? "A bola esta esperando."
+                ? ""
                 : `${summary.totalPeople} nomes prontos para jogar`}
             </Typography>
           </Box>
@@ -557,6 +636,7 @@ export function TeamDrawPage() {
             isLoadingPlayers={registeredPlayers.length === 0}
             onAdd={addParticipant}
             onAddMonthlyPlayers={addAllMonthlyPlayers}
+            onOpenGoalkeeperImport={() => setIsGoalkeeperDialogOpen(true)}
             onOpenGuestImport={() => setIsGuestDialogOpen(true)}
             onToggleLateArrival={toggleLateArrival}
             onRemove={removeParticipant}
@@ -656,6 +736,7 @@ export function TeamDrawPage() {
       <DrawMatchModal
         open={isDrawModalOpen}
         teams={displayTeams}
+        kickoffTeamId={kickoffTeamId}
         onClose={() => setIsDrawModalOpen(false)}
         onCopy={copyTeams}
       />
@@ -663,7 +744,17 @@ export function TeamDrawPage() {
       <GuestParticipantsDialog
         open={isGuestDialogOpen}
         onClose={() => setIsGuestDialogOpen(false)}
+        participants={participants}
+        availablePlayers={registeredPlayers}
         onImport={importGuests}
+      />
+
+      <GoalkeeperParticipantsDialog
+        open={isGoalkeeperDialogOpen}
+        onClose={() => setIsGoalkeeperDialogOpen(false)}
+        participants={participants}
+        availablePlayers={registeredPlayers}
+        onImport={importGoalkeepers}
       />
 
       <Box

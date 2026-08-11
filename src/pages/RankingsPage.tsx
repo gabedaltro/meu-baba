@@ -12,14 +12,12 @@ import {
   Box,
   Button,
   Chip,
-  FormControlLabel,
   InputAdornment,
   MenuItem,
   Paper,
   Select,
   Skeleton,
   Stack,
-  Switch,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -38,10 +36,7 @@ import {
   type RankingResponse,
   type RankingStatus,
 } from "../features/rankings/rankingsApi";
-import type {
-  PlayerPosition,
-  PlayerType,
-} from "../features/players/playersApi";
+import type { PlayerType } from "../features/players/playersApi";
 
 const metricLabels: Record<RankingMetric, { label: string; short: string }> = {
   GOALS: { label: "Gols", short: "G" },
@@ -62,34 +57,12 @@ function getStatusFromParams(value: string | null): RankingStatus {
   return value === "INACTIVE" || value === "ALL" ? value : "ACTIVE";
 }
 
-function getPositionFromParams(value: string | null): PlayerPosition | null {
-  return value === "GOALKEEPER" || value === "OUTFIELD" ? value : null;
-}
-
 function getTypeFromParams(value: string | null): PlayerType | null {
   if (value === "ALL") {
     return null;
   }
 
   return value === "GUEST" ? "GUEST" : "MEMBER";
-}
-
-function getLimitFromParams(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const parsedLimit = Number(value);
-
-  if (!Number.isInteger(parsedLimit)) {
-    return null;
-  }
-
-  return Math.min(100, Math.max(1, parsedLimit));
-}
-
-function getBooleanFromParams(value: string | null) {
-  return value === "true";
 }
 
 function getPlayerDisplayName(player: RankingPlayer) {
@@ -328,12 +301,9 @@ export function RankingsPage() {
   const filters = useMemo<RankingFilters>(
     () => ({
       metric: getMetricFromParams(searchParams.get("metric")),
-      limit: getLimitFromParams(searchParams.get("limit")),
       status: getStatusFromParams(searchParams.get("status")),
-      position: getPositionFromParams(searchParams.get("position")),
       type: getTypeFromParams(searchParams.get("type")),
       search: searchParams.get("search")?.trim() || null,
-      includeZero: getBooleanFromParams(searchParams.get("includeZero")),
     }),
     [searchParams],
   );
@@ -511,7 +481,7 @@ export function RankingsPage() {
               display: "grid",
               gridTemplateColumns: {
                 xs: "1fr",
-                md: "2fr repeat(4, minmax(120px, 1fr))",
+                md: "2fr repeat(2, minmax(120px, 1fr))",
               },
               gap: 1.5,
             }}
@@ -545,17 +515,6 @@ export function RankingsPage() {
               <MenuItem value="GUEST">Convidados</MenuItem>
             </Select>
             <Select
-              value={filters.position ?? ""}
-              displayEmpty
-              onChange={(event) =>
-                updateFilter("position", event.target.value || null)
-              }
-            >
-              <MenuItem value="">Todas posições</MenuItem>
-              <MenuItem value="OUTFIELD">Linha</MenuItem>
-              <MenuItem value="GOALKEEPER">Goleiros</MenuItem>
-            </Select>
-            <Select
               value={filters.status}
               onChange={(event) =>
                 updateFilter(
@@ -568,35 +527,7 @@ export function RankingsPage() {
               <MenuItem value="ALL">Todos</MenuItem>
               <MenuItem value="INACTIVE">Inativos</MenuItem>
             </Select>
-            <TextField
-              label="Limite"
-              type="number"
-              value={filters.limit ?? ""}
-              onChange={(event) =>
-                updateFilter(
-                  "limit",
-                  event.target.value
-                    ? Math.min(100, Math.max(1, Number(event.target.value)))
-                    : null,
-                )
-              }
-              placeholder="Todos"
-              helperText="Vazio exibe todos os jogadores retornados pela API."
-              slotProps={{ htmlInput: { min: 1, max: 100 } }}
-            />
           </Box>
-          <FormControlLabel
-            sx={{ mt: 1.5 }}
-            control={
-              <Switch
-                checked={filters.includeZero}
-                onChange={(event) =>
-                  updateFilter("includeZero", event.target.checked)
-                }
-              />
-            }
-            label="Incluir jogadores zerados"
-          />
         </AccordionDetails>
       </Accordion>
 
@@ -619,27 +550,6 @@ export function RankingsPage() {
       ) : null}
 
       <Stack spacing={2}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          sx={{ justifyContent: "space-between", gap: 1 }}
-        >
-          <Box>
-            <Typography variant="h2">
-              Top {metricLabels[filters.metric].label}
-            </Typography>
-            <Typography color="text.secondary">
-              {isLoading
-                ? "Carregando ranking..."
-                : `${rankingResponse?.total ?? 0} jogador${rankingResponse?.total === 1 ? "" : "es"} encontrados`}
-            </Typography>
-          </Box>
-          <Chip
-            label={`Metric: ${metricLabels[filters.metric].label}`}
-            color="primary"
-            sx={{ alignSelf: { xs: "flex-start", sm: "center" } }}
-          />
-        </Stack>
-
         {isLoading ? (
           <Box
             sx={{
@@ -673,8 +583,7 @@ export function RankingsPage() {
               </Avatar>
               <Typography variant="h2">Nenhum jogador encontrado</Typography>
               <Typography color="text.secondary" sx={{ maxWidth: 520 }}>
-                Ajuste os filtros ou inclua jogadores zerados para ampliar o
-                ranking.
+                Ajuste os filtros para ampliar o ranking.
               </Typography>
             </Stack>
           </Paper>

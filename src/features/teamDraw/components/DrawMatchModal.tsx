@@ -1,5 +1,6 @@
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import SportsSoccerOutlinedIcon from "@mui/icons-material/SportsSoccerOutlined";
 import {
@@ -24,6 +25,7 @@ import type { DrawParticipant, DrawTeam } from "../types";
 type DrawMatchModalProps = {
   open: boolean;
   teams: DrawTeam[];
+  kickoffTeamId: number | null;
   onClose: () => void;
   onCopy: () => void;
 };
@@ -36,12 +38,12 @@ type FieldPlayerMarkerProps = {
 };
 
 const leftFormation = [
-  { x: 24, y: 34 },
-  { x: 24, y: 66 },
-  { x: 36, y: 28 },
-  { x: 36, y: 72 },
-  { x: 47, y: 38 },
-  { x: 47, y: 62 },
+  { x: 20, y: 30 },
+  { x: 20, y: 70 },
+  { x: 32, y: 22 },
+  { x: 32, y: 78 },
+  { x: 39, y: 40 },
+  { x: 39, y: 60 },
 ];
 
 const rightFormation = leftFormation.map((position) => ({
@@ -69,28 +71,29 @@ function splitTeamPlayers(team?: DrawTeam) {
 function FieldPlayerMarker({ player, side, x, y }: FieldPlayerMarkerProps) {
   return (
     <Stack
-      spacing={0.5}
+      spacing={0.4}
       sx={{
         position: "absolute",
         left: `${x}%`,
         top: `${y}%`,
         alignItems: "center",
         transform: "translate(-50%, -50%)",
-        width: { xs: 54, sm: 92 },
+        width: { xs: 50, sm: 92 },
+        zIndex: 2,
       }}
     >
       <Avatar
         src={player.photoUrl}
         alt={player.name}
         sx={{
-          width: { xs: 26, sm: 42 },
-          height: { xs: 26, sm: 42 },
+          width: { xs: 30, sm: 42 },
+          height: { xs: 30, sm: 42 },
           border: "2px solid #fff",
           bgcolor: side === "left" ? "#dff5e8" : "#e9f2ff",
           color: side === "left" ? "#0f5f38" : "#164f83",
-          fontSize: { xs: 11, sm: 14 },
+          fontSize: { xs: 12, sm: 14 },
           fontWeight: 900,
-          boxShadow: "0 8px 18px rgba(0,0,0,0.24)",
+          boxShadow: "0 8px 18px rgba(0,0,0,0.32)",
         }}
       >
         {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
@@ -102,10 +105,10 @@ function FieldPlayerMarker({ player, side, x, y }: FieldPlayerMarkerProps) {
           maxWidth: "100%",
           color: "#fff",
           fontWeight: 900,
-          lineHeight: { xs: 0.95, sm: 1.05 },
+          lineHeight: 1,
           textAlign: "center",
-          textShadow: "0 1px 4px rgba(0,0,0,0.72)",
-          fontSize: { xs: 9.5, sm: 12 },
+          textShadow: "0 1px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.9)",
+          fontSize: { xs: 8.5, sm: 12 },
         }}
         noWrap
       >
@@ -122,72 +125,112 @@ function GoalkeeperMarker({
   player?: DrawParticipant;
   side: "left" | "right";
 }) {
-  const x = side === "left" ? 7 : 93;
+  const x = side === "left" ? 8 : 92;
 
   return (
     <Stack
-      spacing={0.5}
+      spacing={0.4}
       sx={{
         position: "absolute",
         left: `${x}%`,
         top: "50%",
         alignItems: "center",
         transform: "translate(-50%, -50%)",
-        width: { xs: 56, sm: 92 },
+        width: { xs: 60, sm: 92 },
+        zIndex: 2,
       }}
     >
       <Avatar
         src={player?.photoUrl}
         alt={player?.name ?? "Goleiro"}
         sx={{
-          width: { xs: 30, sm: 50 },
-          height: { xs: 30, sm: 50 },
+          width: { xs: 32, sm: 50 },
+          height: { xs: 32, sm: 50 },
           border: "3px solid #fff",
           bgcolor: "#ffe9a8",
           color: "#6b4300",
-          fontSize: { xs: 12, sm: 15 },
+          fontSize: { xs: 13, sm: 15 },
           fontWeight: 900,
-          boxShadow: "0 10px 22px rgba(0,0,0,0.28)",
+          boxShadow: "0 10px 22px rgba(0,0,0,0.32)",
         }}
       >
         {player?.name.charAt(0).toLocaleUpperCase("pt-BR") ?? "G"}
       </Avatar>
       <Chip
-        label={player ? getPlayerLabel(player) : "Sem goleiro"}
+        label={player ? getPlayerLabel(player) : "Vazio"}
         size="small"
         sx={{
           maxWidth: "100%",
-          bgcolor: "rgba(255,255,255,0.9)",
+          bgcolor: "rgba(255,255,255,0.94)",
           color: "#173d25",
           fontWeight: 800,
-          "& .MuiChip-label": { px: { xs: 0.5, sm: 0.75 }, fontSize: { xs: 9.5, sm: 12 } },
+          "& .MuiChip-label": { px: { xs: 0.75, sm: 0.75 }, fontSize: { xs: 9.5, sm: 12 } },
         }}
       />
     </Stack>
   );
 }
 
-function MatchField({ teamOne, teamTwo }: { teamOne?: DrawTeam; teamTwo?: DrawTeam }) {
+function KickoffBadge({
+  isKickoffTeam,
+  align,
+}: {
+  isKickoffTeam: boolean;
+  align: "flex-start" | "flex-end";
+}) {
+  return (
+    <Chip
+      icon={
+        isKickoffTeam ? (
+          <SportsSoccerOutlinedIcon sx={{ fontSize: { xs: 13, sm: 16 } }} />
+        ) : (
+          <FlagOutlinedIcon sx={{ fontSize: { xs: 13, sm: 16 } }} />
+        )
+      }
+      label={isKickoffTeam ? "Bola inicial" : "Escolhe o campo"}
+      size="small"
+      sx={{
+        alignSelf: align,
+        bgcolor: isKickoffTeam ? "#ffd54f" : "rgba(255,255,255,0.92)",
+        color: "#173d25",
+        fontWeight: 800,
+        "& .MuiChip-label": { px: 0.75, fontSize: { xs: 8.5, sm: 11 } },
+        "& .MuiChip-icon": { ml: 0.6, color: "#173d25" },
+      }}
+    />
+  );
+}
+
+function MatchField({
+  teamOne,
+  teamTwo,
+  kickoffTeamId,
+}: {
+  teamOne?: DrawTeam;
+  teamTwo?: DrawTeam;
+  kickoffTeamId: number | null;
+}) {
   const firstTeam = splitTeamPlayers(teamOne);
   const secondTeam = splitTeamPlayers(teamTwo);
+  const showKickoffBadges =
+    Boolean(teamOne) && Boolean(teamTwo) && kickoffTeamId != null;
 
   return (
     <Box
       sx={{
         position: "relative",
-        height: { xs: "min(58vh, 350px)", sm: 520 },
-        minHeight: { xs: 315, sm: 520 },
-        borderRadius: 2,
+        height: { xs: "min(64vh, 420px)", sm: 520 },
+        minHeight: { xs: 380, sm: 520 },
+        borderRadius: 3,
         overflow: "hidden",
         bgcolor: "#14733f",
         backgroundImage:
-          "linear-gradient(90deg, rgba(255,255,255,0.04) 50%, transparent 50%), linear-gradient(0deg, rgba(255,255,255,0.05) 50%, transparent 50%)",
-        backgroundSize: { xs: "56px 56px, 100% 52px", sm: "80px 80px, 100% 70px" },
+          "repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 11%, transparent 11%, transparent 22%), radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06), transparent 60%)",
         border: { xs: "2px solid rgba(255,255,255,0.85)", sm: "3px solid rgba(255,255,255,0.85)" },
-        boxShadow: "inset 0 0 0 2px rgba(0,0,0,0.08), 0 24px 70px rgba(5,39,22,0.22)",
+        boxShadow: "inset 0 0 0 2px rgba(0,0,0,0.08), 0 24px 70px rgba(5,39,22,0.28)",
       }}
     >
-      <Box sx={{ position: "absolute", inset: { xs: 10, sm: 18 }, border: "2px solid rgba(255,255,255,0.88)" }} />
+      <Box sx={{ position: "absolute", inset: { xs: 10, sm: 18 }, border: "2px solid rgba(255,255,255,0.88)", borderRadius: 1 }} />
       <Box
         sx={{
           position: "absolute",
@@ -202,9 +245,21 @@ function MatchField({ teamOne, teamTwo }: { teamOne?: DrawTeam; teamTwo?: DrawTe
           position: "absolute",
           left: "50%",
           top: "50%",
-          width: { xs: 72, sm: 130 },
-          height: { xs: 72, sm: 130 },
+          width: { xs: 76, sm: 130 },
+          height: { xs: 76, sm: 130 },
           border: "2px solid rgba(255,255,255,0.88)",
+          borderRadius: "50%",
+          transform: "translate(-50%, -50%)",
+        }}
+      />
+      <Box
+        sx={{
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          width: 6,
+          height: 6,
+          bgcolor: "rgba(255,255,255,0.88)",
           borderRadius: "50%",
           transform: "translate(-50%, -50%)",
         }}
@@ -236,15 +291,38 @@ function MatchField({ teamOne, teamTwo }: { teamOne?: DrawTeam; teamTwo?: DrawTe
         direction="row"
         sx={{
           position: "absolute",
-          left: 18,
-          right: 18,
-          top: 14,
+          left: 14,
+          right: 14,
+          top: 12,
           justifyContent: "space-between",
           pointerEvents: "none",
+          zIndex: 3,
         }}
       >
-        <Chip label={teamOne?.name ?? "Time 1"} sx={{ bgcolor: "#fff", fontWeight: 900 }} />
-        <Chip label={teamTwo?.name ?? "Time 2"} sx={{ bgcolor: "#fff", fontWeight: 900 }} />
+        <Stack spacing={0.5} sx={{ alignItems: "flex-start" }}>
+          <Chip
+            label={teamOne?.name ?? "Time 1"}
+            sx={{ bgcolor: "#fff", fontWeight: 900, fontSize: { xs: 11, sm: 13 } }}
+          />
+          {showKickoffBadges ? (
+            <KickoffBadge
+              isKickoffTeam={teamOne?.id === kickoffTeamId}
+              align="flex-start"
+            />
+          ) : null}
+        </Stack>
+        <Stack spacing={0.5} sx={{ alignItems: "flex-end" }}>
+          <Chip
+            label={teamTwo?.name ?? "Time 2"}
+            sx={{ bgcolor: "#fff", fontWeight: 900, fontSize: { xs: 11, sm: 13 } }}
+          />
+          {showKickoffBadges ? (
+            <KickoffBadge
+              isKickoffTeam={teamTwo?.id === kickoffTeamId}
+              align="flex-end"
+            />
+          ) : null}
+        </Stack>
       </Stack>
 
       <GoalkeeperMarker player={firstTeam.goalkeeper} side="left" />
@@ -369,7 +447,13 @@ function AllTeamsList({ teams }: { teams: DrawTeam[] }) {
   );
 }
 
-export function DrawMatchModal({ open, teams, onClose, onCopy }: DrawMatchModalProps) {
+export function DrawMatchModal({
+  open,
+  teams,
+  kickoffTeamId,
+  onClose,
+  onCopy,
+}: DrawMatchModalProps) {
   const [activeTab, setActiveTab] = useState(0);
   const didCopyOnOpenRef = useRef(false);
   const teamOne = teams[0];
@@ -445,20 +529,17 @@ export function DrawMatchModal({ open, teams, onClose, onCopy }: DrawMatchModalP
       <DialogContent sx={{ bgcolor: "#f3f7f4", p: { xs: 1, sm: 3 }, overflowX: "hidden" }}>
         {activeTab === 0 ? (
           <Stack spacing={{ xs: 1, sm: 2 }}>
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{ justifyContent: "space-between" }}
-            >
-              <Chip label="Formacao 2-2-2" color="success" size="small" sx={{ fontWeight: 900, flex: 1, maxWidth: { xs: 180, sm: "none" } }} />
-              <Chip
-                icon={<ContentCopyOutlinedIcon />}
-                label="Copiado ao abrir"
-                variant="outlined"
-                sx={{ bgcolor: "#fff" }}
-              />
-            </Stack>
-            <MatchField teamOne={teamOne} teamTwo={teamTwo} />
+            <Chip
+              label="Formacao 2-2-2"
+              color="success"
+              size="small"
+              sx={{ fontWeight: 900, alignSelf: "flex-start" }}
+            />
+            <MatchField
+              teamOne={teamOne}
+              teamTwo={teamTwo}
+              kickoffTeamId={kickoffTeamId}
+            />
           </Stack>
         ) : (
           <AllTeamsList teams={teams} />

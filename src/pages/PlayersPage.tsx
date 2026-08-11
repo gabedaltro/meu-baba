@@ -21,6 +21,7 @@ import {
   MenuItem,
   Paper,
   Select,
+  Snackbar,
   Stack,
   TextField,
   Tooltip,
@@ -38,6 +39,7 @@ import {
   type PlayerPayload,
   type PlayerPosition,
   type PlayerType,
+  sortPlayers,
   updatePlayer,
   updatePlayerStats,
 } from "../features/players/playersApi";
@@ -57,8 +59,12 @@ type PlayerFormState = {
   photoUrl: string;
   position: PlayerPosition;
   type: PlayerType;
-  goals: string;
-  assists: string;
+};
+
+type SnackbarState = {
+  open: boolean;
+  message: string;
+  severity: "success" | "error";
 };
 
 const emptyStatsForm: PlayerStatsFormState = {
@@ -74,8 +80,6 @@ const emptyForm: PlayerFormState = {
   photoUrl: "",
   position: "OUTFIELD",
   type: "MEMBER",
-  goals: "0",
-  assists: "0",
 };
 
 function getPlayerPayload(form: PlayerFormState): PlayerPayload {
@@ -99,8 +103,6 @@ function getFormFromPlayer(player: Player): PlayerFormState {
     photoUrl: player.photoUrl ?? "",
     position: player.position,
     type: player.type ?? "MEMBER",
-    goals: String(player.goals),
-    assists: String(player.assists),
   };
 }
 
@@ -110,6 +112,7 @@ function getStatsFormFromPlayer(player: Player): PlayerStatsFormState {
     assists: String(player.assists),
   };
 }
+
 function getPlayerTypeLabel(player: Player) {
   if (player.position === "GOALKEEPER") {
     return "Goleiro";
@@ -140,33 +143,65 @@ function getPlayerSubtitle(player: Player) {
   return details.join(" - ");
 }
 
+function replacePlayer(players: Player[], updatedPlayer: Player) {
+  return sortPlayers(
+    players.map((player) =>
+      String(player.id) === String(updatedPlayer.id) ? updatedPlayer : player,
+    ),
+  );
+}
+
 export function PlayersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadErrorMessage, setLoadErrorMessage] = useState("");
+
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [form, setForm] = useState<PlayerFormState>(emptyForm);
   const [editingPlayerId, setEditingPlayerId] = useState<
     string | number | null
   >(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [formErrorMessage, setFormErrorMessage] = useState("");
+
   const [statsPlayer, setStatsPlayer] = useState<Player | null>(null);
   const [statsForm, setStatsForm] =
     useState<PlayerStatsFormState>(emptyStatsForm);
   const [isSavingStats, setIsSavingStats] = useState(false);
   const [statsErrorMessage, setStatsErrorMessage] = useState("");
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+
+  const [togglingPlayerId, setTogglingPlayerId] = useState<
+    string | number | null
+  >(null);
+
+  const [snackbar, setSnackbar] = useState<SnackbarState>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
   const activePlayersCount = useMemo(
     () => players.filter((player) => player.isActive).length,
     [players],
   );
 
+  const showSnackbar = (
+    message: string,
+    severity: SnackbarState["severity"] = "success",
+  ) => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar((current) => ({ ...current, open: false }));
+  };
+
   const loadPlayers = async () => {
     try {
       setPlayers(await fetchPlayers());
+      setLoadErrorMessage("");
     } catch {
-      setErrorMessage("Nao foi possivel carregar os jogadores.");
-    } finally {
-      setIsLoading(false);
+      setLoadErrorMessage("Nao foi possivel carregar os jogadores.");
     }
   };
 
@@ -181,7 +216,7 @@ export function PlayersPage() {
       })
       .catch(() => {
         if (isMounted) {
-          setErrorMessage("Nao foi possivel carregar os jogadores.");
+          setLoadErrorMessage("Nao foi possivel carregar os jogadores.");
         }
       })
       .finally(() => {
@@ -195,72 +230,63 @@ export function PlayersPage() {
     };
   }, []);
 
-  const resetForm = () => {
-    setForm(emptyForm);
+  const openCreateDialog = () => {
     setEditingPlayerId(null);
+    setForm(emptyForm);
+    setFormErrorMessage("");
+    setIsFormDialogOpen(true);
+  };
+
+  const openEditDialog = (player: Player) => {
+    setEditingPlayerId(player.id);
+    setForm(getFormFromPlayer(player));
+    setFormErrorMessage("");
+    setIsFormDialogOpen(true);
+  };
+
+  const closeFormDialog = () => {
+    if (isSaving) {
+      return;
+    }
+
+    setIsFormDialogOpen(false);
+    setFormErrorMessage("");
   };
 
   const savePlayer = async () => {
     const payload = getPlayerPayload(form);
 
     if (!payload.name) {
-      setErrorMessage("Informe o nome do jogador.");
-      return;
-    }
-
-    const goals = Number(form.goals || 0);
-    const assists = Number(form.assists || 0);
-
-    if (
-      editingPlayerId &&
-      (!Number.isInteger(goals) ||
-        !Number.isInteger(assists) ||
-        goals < 0 ||
-        assists < 0)
-    ) {
-      setErrorMessage(
-        "Gols e assistências devem ser inteiros maiores ou iguais a zero.",
-      );
+      setFormErrorMessage("Informe o nome do jogador.");
       return;
     }
 
     setIsSaving(true);
-    setErrorMessage("");
-    setMessage("");
+    setFormErrorMessage("");
 
     try {
       if (editingPlayerId) {
-        await updatePlayer(editingPlayerId, payload);
-        await updatePlayerStats(editingPlayerId, {
-          goals,
-          assists,
-        });
-        setMessage("Jogador atualizado com sucesso.");
+        const updatedPlayer = await updatePlayer(editingPlayerId, payload);
+        setPlayers((current) => replacePlayer(current, updatedPlayer));
+        showSnackbar("Jogador atualizado com sucesso.");
       } else {
         await createPlayer(payload);
-        setMessage("Jogador cadastrado com sucesso.");
+        await loadPlayers();
+        showSnackbar("Jogador cadastrado com sucesso.");
       }
 
-      resetForm();
-      await loadPlayers();
+      setIsFormDialogOpen(false);
     } catch {
-      setErrorMessage("Nao foi possivel salvar o jogador.");
+      setFormErrorMessage("Nao foi possivel salvar o jogador.");
     } finally {
       setIsSaving(false);
     }
-  };
-  const editPlayer = (player: Player) => {
-    setEditingPlayerId(player.id);
-    setForm(getFormFromPlayer(player));
-    setMessage("");
-    setErrorMessage("");
   };
 
   const openStatsDialog = (player: Player) => {
     setStatsPlayer(player);
     setStatsForm(getStatsFormFromPlayer(player));
     setStatsErrorMessage("");
-    setMessage("");
   };
 
   const closeStatsDialog = () => {
@@ -357,7 +383,6 @@ export function PlayersPage() {
 
     setIsSavingStats(true);
     setStatsErrorMessage("");
-    setMessage("");
 
     try {
       const updatedPlayer = await updatePlayerStats(statsPlayer.id, {
@@ -365,23 +390,8 @@ export function PlayersPage() {
         assists,
       });
 
-      setPlayers((currentPlayers) =>
-        currentPlayers.map((player) =>
-          String(player.id) === String(updatedPlayer.id)
-            ? updatedPlayer
-            : player,
-        ),
-      );
-
-      if (String(editingPlayerId) === String(updatedPlayer.id)) {
-        setForm((current) => ({
-          ...current,
-          goals: String(updatedPlayer.goals),
-          assists: String(updatedPlayer.assists),
-        }));
-      }
-
-      setMessage("Estatisticas atualizadas com sucesso.");
+      setPlayers((current) => replacePlayer(current, updatedPlayer));
+      showSnackbar("Estatisticas atualizadas com sucesso.");
       setStatsPlayer(null);
       setStatsForm(emptyStatsForm);
     } catch {
@@ -390,22 +400,23 @@ export function PlayersPage() {
       setIsSavingStats(false);
     }
   };
+
   const togglePlayerStatus = async (player: Player) => {
-    setErrorMessage("");
-    setMessage("");
+    setTogglingPlayerId(player.id);
 
     try {
-      if (player.isActive) {
-        await deactivatePlayer(player.id);
-        setMessage("Jogador inativado.");
-      } else {
-        await activatePlayer(player.id);
-        setMessage("Jogador reativado.");
-      }
+      const updatedPlayer = player.isActive
+        ? await deactivatePlayer(player.id)
+        : await activatePlayer(player.id);
 
-      await loadPlayers();
+      setPlayers((current) => replacePlayer(current, updatedPlayer));
+      showSnackbar(
+        updatedPlayer.isActive ? "Jogador reativado." : "Jogador inativado.",
+      );
     } catch {
-      setErrorMessage("Nao foi possivel alterar o status do jogador.");
+      showSnackbar("Nao foi possivel alterar o status do jogador.", "error");
+    } finally {
+      setTogglingPlayerId(null);
     }
   };
 
@@ -448,42 +459,204 @@ export function PlayersPage() {
               para o sorteio
             </Typography>
           </Box>
-          <Button
-            component={RouterLink}
-            to="/sorteio"
-            variant="outlined"
-            startIcon={<ArrowBackOutlinedIcon />}
-            sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.55)" }}
-          >
-            Ir para sorteio
-          </Button>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Button
+              variant="contained"
+              onClick={openCreateDialog}
+              startIcon={<AddOutlinedIcon />}
+              sx={{ bgcolor: "#fff", color: "#155b39", "&:hover": { bgcolor: "#eef5f0" } }}
+            >
+              Novo jogador
+            </Button>
+            <Button
+              component={RouterLink}
+              to="/sorteio"
+              variant="outlined"
+              startIcon={<ArrowBackOutlinedIcon />}
+              sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.55)" }}
+            >
+              Ir para sorteio
+            </Button>
+          </Stack>
         </Stack>
       </Paper>
 
-      {message ? <Alert severity="success">{message}</Alert> : null}
-      {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
+      {loadErrorMessage ? <Alert severity="error">{loadErrorMessage}</Alert> : null}
 
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", lg: "390px minmax(0, 1fr)" },
-          gap: 3,
-        }}
-      >
-        <Paper
-          variant="outlined"
-          sx={{ p: { xs: 2, sm: 3 }, height: "fit-content" }}
-        >
-          <Stack spacing={2}>
-            <Typography variant="h2">
-              {editingPlayerId ? "Editar jogador" : "Novo jogador"}
+      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
+        <Stack spacing={2}>
+          <Typography variant="h2">Jogadores cadastrados</Typography>
+          {isLoading ? (
+            <Stack sx={{ alignItems: "center", py: 5 }}>
+              <CircularProgress />
+            </Stack>
+          ) : players.length === 0 ? (
+            <Typography color="text.secondary">
+              Nenhum jogador cadastrado.
             </Typography>
+          ) : (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "repeat(2, minmax(0, 1fr))",
+                },
+                gap: 1,
+              }}
+            >
+              {players.map((player) => {
+                const isToggling = togglingPlayerId === player.id;
+
+                return (
+                  <Stack
+                    key={player.id}
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      alignItems: "center",
+                      border: "1px solid",
+                      borderColor: player.isActive
+                        ? "divider"
+                        : "rgba(211, 47, 47, 0.28)",
+                      borderRadius: 2,
+                      bgcolor: player.isActive
+                        ? "#f7faf8"
+                        : "rgba(211, 47, 47, 0.04)",
+                      p: 1,
+                    }}
+                  >
+                    <Avatar
+                      src={player.photoUrl ?? undefined}
+                      alt={player.name}
+                      sx={{ width: 40, height: 40 }}
+                    >
+                      {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
+                    </Avatar>
+                    <Stack sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 800 }}
+                        noWrap
+                      >
+                        {player.name}
+                      </Typography>
+                      {getPlayerSubtitle(player) ? (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          noWrap
+                        >
+                          {getPlayerSubtitle(player)}
+                        </Typography>
+                      ) : null}
+                      <Stack
+                        direction="row"
+                        spacing={0.75}
+                        useFlexGap
+                        sx={{ flexWrap: "wrap", mt: 0.5 }}
+                      >
+                        <Chip
+                          label={getPlayerTypeLabel(player)}
+                          size="small"
+                          color={getPlayerTypeColor(player)}
+                        />
+                        <Chip
+                          label={`${player.goals} gol${player.goals === 1 ? "" : "s"}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip
+                          label={`${player.assists} assist${
+                            player.assists === 1 ? "" : "s"
+                          }`}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip
+                          label={player.isActive ? "Ativo" : "Inativo"}
+                          size="small"
+                          color={player.isActive ? "success" : "error"}
+                          variant="outlined"
+                        />
+                      </Stack>
+                    </Stack>
+                    <Tooltip title="Atualizar estatisticas">
+                      <IconButton
+                        color="primary"
+                        onClick={() => openStatsDialog(player)}
+                        disabled={isToggling}
+                        aria-label={`Atualizar gols e assistências de ${player.name}`}
+                      >
+                        <SportsSoccerOutlinedIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Editar jogador">
+                      <IconButton
+                        onClick={() => openEditDialog(player)}
+                        disabled={isToggling}
+                        aria-label={`Editar ${player.name}`}
+                      >
+                        <EditOutlinedIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip
+                      title={
+                        player.isActive
+                          ? "Inativar jogador"
+                          : "Reativar jogador"
+                      }
+                    >
+                      <span>
+                        <IconButton
+                          color={player.isActive ? "warning" : "success"}
+                          onClick={() => void togglePlayerStatus(player)}
+                          disabled={isToggling}
+                          aria-label={
+                            player.isActive
+                              ? `Inativar ${player.name}`
+                              : `Reativar ${player.name}`
+                          }
+                        >
+                          {isToggling ? (
+                            <CircularProgress size={20} color="inherit" />
+                          ) : player.isActive ? (
+                            <PauseCircleOutlineOutlinedIcon />
+                          ) : (
+                            <PlayCircleOutlineOutlinedIcon />
+                          )}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Stack>
+                );
+              })}
+            </Box>
+          )}
+        </Stack>
+      </Paper>
+
+      <Dialog
+        open={isFormDialogOpen}
+        onClose={closeFormDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {editingPlayerId ? "Editar jogador" : "Novo jogador"}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            {formErrorMessage ? (
+              <Alert severity="error">{formErrorMessage}</Alert>
+            ) : null}
             <TextField
               label="Nome"
               value={form.name}
               onChange={(event) =>
                 setForm((current) => ({ ...current, name: event.target.value }))
               }
+              autoFocus
               fullWidth
             />
             <TextField
@@ -569,201 +742,31 @@ export function PlayersPage() {
               }
               fullWidth
             />
-            {editingPlayerId ? (
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-                <TextField
-                  label="Gols"
-                  type="number"
-                  value={form.goals}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      goals: event.target.value,
-                    }))
-                  }
-                  slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                  fullWidth
-                />
-                <TextField
-                  label="Assistências"
-                  type="number"
-                  value={form.assists}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      assists: event.target.value,
-                    }))
-                  }
-                  slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                  fullWidth
-                />
-              </Stack>
-            ) : null}
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              <Button
-                variant="contained"
-                startIcon={
-                  isSaving ? (
-                    <CircularProgress color="inherit" size={18} />
-                  ) : editingPlayerId ? (
-                    <SaveOutlinedIcon />
-                  ) : (
-                    <AddOutlinedIcon />
-                  )
-                }
-                onClick={savePlayer}
-                disabled={isSaving}
-                fullWidth
-              >
-                {editingPlayerId ? "Salvar" : "Cadastrar"}
-              </Button>
-              {editingPlayerId ? (
-                <Button variant="outlined" onClick={resetForm} fullWidth>
-                  Cancelar
-                </Button>
-              ) : null}
-            </Stack>
           </Stack>
-        </Paper>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={closeFormDialog} disabled={isSaving}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void savePlayer()}
+            disabled={isSaving}
+            startIcon={
+              isSaving ? (
+                <CircularProgress color="inherit" size={18} />
+              ) : editingPlayerId ? (
+                <SaveOutlinedIcon />
+              ) : (
+                <AddOutlinedIcon />
+              )
+            }
+          >
+            {editingPlayerId ? "Salvar" : "Cadastrar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-          <Stack spacing={2}>
-            <Typography variant="h2">Jogadores cadastrados</Typography>
-            {isLoading ? (
-              <Stack sx={{ alignItems: "center", py: 5 }}>
-                <CircularProgress />
-              </Stack>
-            ) : players.length === 0 ? (
-              <Typography color="text.secondary">
-                Nenhum jogador cadastrado.
-              </Typography>
-            ) : (
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: {
-                    xs: "1fr",
-                    md: "repeat(2, minmax(0, 1fr))",
-                  },
-                  gap: 1,
-                }}
-              >
-                {players.map((player) => (
-                  <Stack
-                    key={player.id}
-                    direction="row"
-                    spacing={1}
-                    sx={{
-                      alignItems: "center",
-                      border: "1px solid",
-                      borderColor: player.isActive
-                        ? "divider"
-                        : "rgba(211, 47, 47, 0.28)",
-                      borderRadius: 2,
-                      bgcolor: player.isActive
-                        ? "#f7faf8"
-                        : "rgba(211, 47, 47, 0.04)",
-                      p: 1,
-                    }}
-                  >
-                    <Avatar
-                      src={player.photoUrl ?? undefined}
-                      alt={player.name}
-                      sx={{ width: 40, height: 40 }}
-                    >
-                      {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
-                    </Avatar>
-                    <Stack sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 800 }}
-                        noWrap
-                      >
-                        {player.name}
-                      </Typography>
-                      {getPlayerSubtitle(player) ? (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          noWrap
-                        >
-                          {getPlayerSubtitle(player)}
-                        </Typography>
-                      ) : null}
-                      <Stack
-                        direction="row"
-                        spacing={0.75}
-                        useFlexGap
-                        sx={{ flexWrap: "wrap", mt: 0.5 }}
-                      >
-                        <Chip
-                          label={getPlayerTypeLabel(player)}
-                          size="small"
-                          color={getPlayerTypeColor(player)}
-                        />
-                        <Chip
-                          label={`${player.goals} gol${player.goals === 1 ? "" : "s"}`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={`${player.assists} assist${
-                            player.assists === 1 ? "" : "s"
-                          }`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={player.isActive ? "Ativo" : "Inativo"}
-                          size="small"
-                          color={player.isActive ? "success" : "error"}
-                          variant="outlined"
-                        />
-                      </Stack>
-                    </Stack>
-                    <Tooltip title="Atualizar estatisticas">
-                      <IconButton
-                        color="primary"
-                        onClick={() => openStatsDialog(player)}
-                        aria-label={`Atualizar gols e assistências de ${player.name}`}
-                      >
-                        <SportsSoccerOutlinedIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Editar jogador">
-                      <IconButton
-                        onClick={() => editPlayer(player)}
-                        aria-label={`Editar ${player.name}`}
-                      >
-                        <EditOutlinedIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip
-                      title={
-                        player.isActive
-                          ? "Inativar jogador"
-                          : "Reativar jogador"
-                      }
-                    >
-                      <IconButton
-                        color={player.isActive ? "warning" : "success"}
-                        onClick={() => void togglePlayerStatus(player)}
-                      >
-                        {player.isActive ? (
-                          <PauseCircleOutlineOutlinedIcon />
-                        ) : (
-                          <PlayCircleOutlineOutlinedIcon />
-                        )}
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
-                ))}
-              </Box>
-            )}
-          </Stack>
-        </Paper>
-      </Box>
       <Dialog
         open={Boolean(statsPlayer)}
         onClose={closeStatsDialog}
@@ -925,6 +928,22 @@ export function PlayersPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={closeSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={closeSnackbar}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

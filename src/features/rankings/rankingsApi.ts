@@ -6,12 +6,9 @@ export type RankingStatus = 'ACTIVE' | 'INACTIVE' | 'ALL'
 
 export type RankingFilters = {
   metric: RankingMetric
-  limit?: number | null
   status: RankingStatus
-  position?: PlayerPosition | null
   type?: PlayerType | null
   search?: string | null
-  includeZero: boolean
 }
 
 export type RankingPlayer = {
@@ -32,12 +29,9 @@ export type RankingResponse = {
   metric: RankingMetric
   total: number
   filters: {
-    limit?: number | null
     status: RankingStatus
-    position: PlayerPosition | null
     type: PlayerType | null
     search: string | null
-    includeZero: boolean
   }
   ranking: RankingPlayer[]
 }
@@ -47,12 +41,9 @@ export async function fetchPlayerRankings(filters: RankingFilters) {
     skipAuth: true,
     params: {
       metric: filters.metric,
-      limit: filters.limit || undefined,
       status: filters.status,
-      position: filters.position || undefined,
       type: filters.type || undefined,
       search: filters.search || undefined,
-      includeZero: filters.includeZero || undefined,
     },
   })
 

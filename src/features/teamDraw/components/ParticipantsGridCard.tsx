@@ -3,6 +3,7 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import GroupAddOutlinedIcon from "@mui/icons-material/GroupAddOutlined";
 import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import {
   Avatar,
   Box,
@@ -36,6 +37,7 @@ type ParticipantsGridCardProps = {
   isLoadingPlayers: boolean;
   onAdd: (playerIds: string[]) => number;
   onAddMonthlyPlayers: () => void;
+  onOpenGoalkeeperImport: () => void;
   onOpenGuestImport: () => void;
   onToggleLateArrival: (participantId: string) => void;
   onRemove: (participantId: string) => void;
@@ -66,6 +68,7 @@ export function ParticipantsGridCard({
   isLoadingPlayers,
   onAdd,
   onAddMonthlyPlayers,
+  onOpenGoalkeeperImport,
   onOpenGuestImport,
   onToggleLateArrival,
   onRemove,
@@ -81,6 +84,9 @@ export function ParticipantsGridCard({
   );
   const selectableMonthlyPlayers = selectablePlayers.filter(
     (player) => player.type === "monthly_player",
+  );
+  const selectableGoalkeepers = selectablePlayers.filter(
+    (player) => player.type === "goalkeeper",
   );
 
   const addParticipant = () => {
@@ -125,12 +131,7 @@ export function ParticipantsGridCard({
           </Button>
         </Stack>
 
-        <Stack
-          direction="row"
-          spacing={1.5}
-          useFlexGap
-          sx={{ flexWrap: "wrap", alignItems: "stretch" }}
-        >
+        <Stack spacing={1.5}>
           <Select
             multiple
             value={selectedPlayerIds}
@@ -142,7 +143,7 @@ export function ParticipantsGridCard({
             }}
             displayEmpty
             disabled={isLoadingPlayers || selectablePlayers.length === 0}
-            sx={{ flex: "1 1 260px", minWidth: { xs: "100%", sm: 260 } }}
+            fullWidth
             renderValue={(selected) => {
               if (selected.length === 0) {
                 return isLoadingPlayers
@@ -195,50 +196,55 @@ export function ParticipantsGridCard({
               );
             })}
           </Select>
-          <Button
-            variant="contained"
-            startIcon={<AddOutlinedIcon />}
-            onClick={addParticipant}
-            disabled={selectedPlayerIds.length === 0}
+          <Box
             sx={{
-              flex: "1 1 150px",
-              minWidth: 0,
-              maxWidth: { xs: "none", lg: 180 },
-              whiteSpace: "normal",
-              lineHeight: 1.15,
+              display: "grid",
+              gap: 1.25,
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+                md: "repeat(4, minmax(0, 1fr))",
+              },
             }}
           >
-            Adicionar selecionados
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<GroupAddOutlinedIcon />}
-            onClick={onAddMonthlyPlayers}
-            disabled={isLoadingPlayers || selectableMonthlyPlayers.length === 0}
-            sx={{
-              flex: "1 1 170px",
-              minWidth: 0,
-              maxWidth: { xs: "none", lg: 210 },
-              whiteSpace: "normal",
-              lineHeight: 1.15,
-            }}
-          >
-            Adicionar mensalistas
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<PersonAddAltOutlinedIcon />}
-            onClick={onOpenGuestImport}
-            sx={{
-              flex: "1 1 140px",
-              minWidth: 0,
-              maxWidth: { xs: "none", lg: 170 },
-              whiteSpace: "normal",
-              lineHeight: 1.15,
-            }}
-          >
-            Convidados
-          </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddOutlinedIcon />}
+              onClick={addParticipant}
+              disabled={selectedPlayerIds.length === 0}
+              sx={{ whiteSpace: "normal", lineHeight: 1.15 }}
+            >
+              Adicionar selecionados
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<GroupAddOutlinedIcon />}
+              onClick={onAddMonthlyPlayers}
+              disabled={
+                isLoadingPlayers || selectableMonthlyPlayers.length === 0
+              }
+              sx={{ whiteSpace: "normal", lineHeight: 1.15 }}
+            >
+              Adicionar mensalistas
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<ShieldOutlinedIcon />}
+              onClick={onOpenGoalkeeperImport}
+              disabled={isLoadingPlayers || selectableGoalkeepers.length === 0}
+              sx={{ whiteSpace: "normal", lineHeight: 1.15 }}
+            >
+              Adicionar goleiros
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<PersonAddAltOutlinedIcon />}
+              onClick={onOpenGuestImport}
+              sx={{ whiteSpace: "normal", lineHeight: 1.15 }}
+            >
+              Adicionar convidados
+            </Button>
+          </Box>
         </Stack>
 
         {participants.length === 0 ? (
