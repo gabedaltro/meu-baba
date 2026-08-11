@@ -376,7 +376,7 @@ export function PlayersPage() {
 
     if (
       shouldConfirmStatsReduction(statsPlayer, goals, assists) &&
-      !window.confirm("Confirmar reducao grande ou zerar estatisticas?")
+      !window.confirm("Confirmar reducao grande ou zerar estatísticas?")
     ) {
       return;
     }
@@ -391,11 +391,11 @@ export function PlayersPage() {
       });
 
       setPlayers((current) => replacePlayer(current, updatedPlayer));
-      showSnackbar("Estatisticas atualizadas com sucesso.");
+      showSnackbar("Estatísticas atualizadas com sucesso.");
       setStatsPlayer(null);
       setStatsForm(emptyStatsForm);
     } catch {
-      setStatsErrorMessage("Nao foi possivel salvar as estatisticas.");
+      setStatsErrorMessage("Nao foi possivel salvar as estatísticas.");
     } finally {
       setIsSavingStats(false);
     }
@@ -464,7 +464,11 @@ export function PlayersPage() {
               variant="contained"
               onClick={openCreateDialog}
               startIcon={<AddOutlinedIcon />}
-              sx={{ bgcolor: "#fff", color: "#155b39", "&:hover": { bgcolor: "#eef5f0" } }}
+              sx={{
+                bgcolor: "#fff",
+                color: "#155b39",
+                "&:hover": { bgcolor: "#eef5f0" },
+              }}
             >
               Novo jogador
             </Button>
@@ -481,7 +485,9 @@ export function PlayersPage() {
         </Stack>
       </Paper>
 
-      {loadErrorMessage ? <Alert severity="error">{loadErrorMessage}</Alert> : null}
+      {loadErrorMessage ? (
+        <Alert severity="error">{loadErrorMessage}</Alert>
+      ) : null}
 
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack spacing={2}>
@@ -581,7 +587,7 @@ export function PlayersPage() {
                         />
                       </Stack>
                     </Stack>
-                    <Tooltip title="Atualizar estatisticas">
+                    <Tooltip title="Atualizar estatísticas">
                       <IconButton
                         color="primary"
                         onClick={() => openStatsDialog(player)}
@@ -773,7 +779,7 @@ export function PlayersPage() {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Atualizar estatisticas</DialogTitle>
+        <DialogTitle>Atualizar estatísticas</DialogTitle>
         <DialogContent>
           {statsPlayer ? (
             <Stack spacing={2.25} sx={{ pt: 1 }}>
@@ -924,7 +930,7 @@ export function PlayersPage() {
               )
             }
           >
-            Salvar estatisticas
+            Salvar estatísticas
           </Button>
         </DialogActions>
       </Dialog>

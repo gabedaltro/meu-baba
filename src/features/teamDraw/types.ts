@@ -11,6 +11,8 @@ export type DrawParticipant = {
   jerseyNumber?: number
   photoUrl?: string
   isLateArrival?: boolean
+  goals?: number
+  assists?: number
 }
 
 export type DrawTeam = {
@@ -19,5 +21,3 @@ export type DrawTeam = {
   color: 'success' | 'default' | 'primary' | 'secondary'
   players: DrawParticipant[]
 }
-
-

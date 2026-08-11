@@ -17,7 +17,6 @@ import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../features/auth/authContext";
 import { fetchSettings } from "../features/settings/settingsApi";
-import { createTeamDraw } from "../features/teamDraw/services/drawsApi";
 import { DrawConfigCard } from "../features/teamDraw/components/DrawConfigCard";
 import { DrawMatchModal } from "../features/teamDraw/components/DrawMatchModal";
 import { DrawResultCard } from "../features/teamDraw/components/DrawResultCard";
@@ -27,6 +26,7 @@ import {
   type ImportedGuest,
 } from "../features/teamDraw/components/GuestParticipantsDialog";
 import { ParticipantsGridCard } from "../features/teamDraw/components/ParticipantsGridCard";
+import { createTeamDraw } from "../features/teamDraw/services/drawsApi";
 import {
   fetchTeamDrawPlayers,
   mapApiPlayerToDrawParticipant,
@@ -78,6 +78,7 @@ function normalizeParticipantName(name: string) {
     .trim()
     .toLocaleLowerCase("pt-BR");
 }
+
 const localTeamColors: DrawTeam["color"][] = [
   "success",
   "default",
@@ -167,6 +168,7 @@ function generateLocalTeams(
     .map((team) => ({ ...team, players: putGoalkeepersFirst(team.players) }))
     .filter((team) => team.players.length > 0);
 }
+
 function getClipboardPlayerName(player: DrawParticipant) {
   return player.nickname || player.name;
 }
@@ -175,7 +177,7 @@ function formatTeamsForClipboard(
   teams: DrawTeam[],
   kickoffTeamId: number | null,
 ) {
-  const lines = ["\u26bd Baba Champion Multi Arena", ""];
+  const lines = ["⚽ Baba Champion Multi Arena", ""];
 
   const teamOne = teams[0];
   const teamTwo = teams[1];
@@ -192,14 +194,14 @@ function formatTeamsForClipboard(
   teams.forEach((team) => {
     const marker =
       team.name === "Time extra"
-        ? "\ud83d\udfe0"
+        ? "🟠"
         : team.id === 1
-          ? "\ud83d\udfe2"
+          ? "🟢"
           : team.id === 2
-            ? "\u26aa"
+            ? "⚪"
             : team.id === 3
-              ? "\ud83d\udd35"
-              : "\ud83d\udfe1";
+              ? "🔵"
+              : "🟡";
 
     lines.push(`${marker} ${team.name.toUpperCase()}`);
     team.players.forEach((player) => {
@@ -214,6 +216,7 @@ function formatTeamsForClipboard(
 
   return lines.join("\n").trim();
 }
+
 async function copyTextToClipboard(text: string) {
   if (navigator.clipboard?.writeText) {
     try {
@@ -267,11 +270,15 @@ export function TeamDrawPage() {
     const guestCount = participants.filter(
       (participant) => participant.type === "guest",
     ).length;
+    const lateCount = participants.filter(
+      (participant) => participant.isLateArrival,
+    ).length;
 
     return {
       confirmed: participants.length - guestCount,
       goalkeepers: goalkeeperCount,
       guests: guestCount,
+      late: lateCount,
       totalPlayers: participants.length - goalkeeperCount,
       totalPeople: participants.length,
     };
@@ -294,6 +301,7 @@ export function TeamDrawPage() {
           // Settings are optional for the draw screen; keep the local/default value.
         });
     }
+
     fetchTeamDrawPlayers()
       .then((users) => {
         if (isMounted) {
@@ -302,7 +310,7 @@ export function TeamDrawPage() {
       })
       .catch(() => {
         if (isMounted) {
-          setSnackbarMessage("Nao foi possivel carregar os jogadores da API.");
+          setSnackbarMessage("Não foi possível carregar os jogadores da API.");
         }
       });
 
@@ -333,7 +341,7 @@ export function TeamDrawPage() {
 
     if (playersToAdd.length === 0) {
       setSnackbarMessage(
-        "Selecione jogadores cadastrados que ainda nao estejam na lista.",
+        "Selecione jogadores cadastrados que ainda não estejam na lista.",
       );
       return 0;
     }
@@ -351,6 +359,7 @@ export function TeamDrawPage() {
     );
     return playersToAdd.length;
   };
+
   const addAllMonthlyPlayers = () => {
     const participantIds = new Set(
       participants.map((participant) => String(participant.id)),
@@ -362,7 +371,7 @@ export function TeamDrawPage() {
     );
 
     if (monthlyPlayersToAdd.length === 0) {
-      setSnackbarMessage("Nenhum mensalista disponivel para adicionar.");
+      setSnackbarMessage("Nenhum mensalista disponível para adicionar.");
       return;
     }
 
@@ -469,6 +478,7 @@ export function TeamDrawPage() {
     setTeams([]);
     setIsDrawModalOpen(false);
   };
+
   const removeParticipant = (participantId: string) => {
     setParticipants((currentParticipants) =>
       currentParticipants.filter(
@@ -503,7 +513,7 @@ export function TeamDrawPage() {
         : generateLocalTeams(displayParticipants, maxPlayersPerTeam);
 
       if (generatedTeams.length === 0) {
-        setSnackbarMessage("Nao foi possivel gerar times para este sorteio.");
+        setSnackbarMessage("Não foi possível gerar times para este sorteio.");
         return;
       }
 
@@ -518,7 +528,7 @@ export function TeamDrawPage() {
         isAuthenticated ? "Sorteio gerado pela API." : "Sorteio gerado.",
       );
     } catch {
-      setSnackbarMessage("Nao foi possivel gerar o sorteio.");
+      setSnackbarMessage("Não foi possível gerar o sorteio.");
     } finally {
       setIsDrawing(false);
     }
@@ -529,11 +539,11 @@ export function TeamDrawPage() {
     const didCopy = await copyTextToClipboard(text);
 
     if (didCopy) {
-      setSnackbarMessage("Times copiados para a area de transferencia.");
+      setSnackbarMessage("Times copiados para a área de transferência.");
       return;
     }
 
-    setSnackbarMessage("Nao foi possivel copiar automaticamente.");
+    setSnackbarMessage("Não foi possível copiar automaticamente.");
   };
 
   const shareTeams = async () => {
@@ -547,16 +557,45 @@ export function TeamDrawPage() {
         });
         setSnackbarMessage("Times compartilhados com sucesso.");
         return;
-      } catch {
-        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          setSnackbarMessage("Compartilhamento cancelado.");
+          return;
+        }
       }
     }
 
-    await copyTeams();
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    setSnackbarMessage("Abrindo WhatsApp para compartilhar os times.");
   };
 
   const closeSnackbar = () => {
     setSnackbarMessage("");
+  };
+
+  const changePlayerStat = (
+    participantId: string,
+    stat: "goals" | "assists",
+    delta: number,
+  ) => {
+    const updatePlayer = (player: DrawParticipant): DrawParticipant =>
+      String(player.id) === participantId
+        ? {
+            ...player,
+            [stat]: Math.max(0, (player[stat] ?? 0) + delta),
+          }
+        : player;
+
+    setParticipants((currentParticipants) =>
+      currentParticipants.map(updatePlayer),
+    );
+    setTeams((currentTeams) =>
+      currentTeams.map((team) => ({
+        ...team,
+        players: team.players.map(updatePlayer),
+      })),
+    );
   };
 
   return (
@@ -664,6 +703,9 @@ export function TeamDrawPage() {
                   <Typography variant="body2" color="text.secondary">
                     {summary.goalkeepers} goleiro
                     {summary.goalkeepers === 1 ? "" : "s"} na lista
+                    {summary.late > 0
+                      ? `, ${summary.late} atrasado${summary.late === 1 ? "" : "s"}`
+                      : ""}
                   </Typography>
                 </Box>
                 <Avatar sx={{ bgcolor: "#e3f1e8", color: "primary.main" }}>
@@ -728,6 +770,7 @@ export function TeamDrawPage() {
               onRedraw={runDraw}
               onCopy={copyTeams}
               onShare={shareTeams}
+              onChangePlayerStat={changePlayerStat}
             />
           </Box>
         </Box>

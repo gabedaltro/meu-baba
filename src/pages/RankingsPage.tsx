@@ -329,7 +329,7 @@ export function RankingsPage() {
       })
       .catch(() => {
         setRankingResponse(null);
-        setErrorMessage("Nao foi possivel carregar o ranking agora.");
+        setErrorMessage("Não foi possível carregar o ranking agora.");
       })
       .finally(() => {
         setIsLoading(false);
@@ -348,7 +348,7 @@ export function RankingsPage() {
       .catch(() => {
         if (isMounted) {
           setRankingResponse(null);
-          setErrorMessage("Nao foi possivel carregar o ranking agora.");
+          setErrorMessage("Não foi possível carregar o ranking agora.");
         }
       })
       .finally(() => {
