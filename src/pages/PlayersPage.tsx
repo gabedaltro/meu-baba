@@ -1,5 +1,6 @@
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import PauseCircleOutlineOutlinedIcon from "@mui/icons-material/PauseCircleOutlineOutlined";
 import PlayCircleOutlineOutlinedIcon from "@mui/icons-material/PlayCircleOutlineOutlined";
@@ -32,21 +33,27 @@ import { Link as RouterLink } from "react-router-dom";
 import {
   activatePlayer,
   createPlayer,
+  createPlayerStatEntry,
   deactivatePlayer,
+  deleteStatEntry,
+  fetchPlayer,
+  fetchPlayerStatEntries,
   fetchPlayers,
   type JerseySize,
   type Player,
   type PlayerPayload,
   type PlayerPosition,
+  type PlayerStatEntry,
   type PlayerType,
   sortPlayers,
   updatePlayer,
-  updatePlayerStats,
+  updateStatEntry,
 } from "../features/players/playersApi";
 
 const jerseySizes: JerseySize[] = ["XS", "S", "M", "L", "XL", "XXL"];
 
-type PlayerStatsFormState = {
+type StatEntryFormState = {
+  matchDate: string;
   goals: string;
   assists: string;
 };
@@ -67,10 +74,23 @@ type SnackbarState = {
   severity: "success" | "error";
 };
 
-const emptyStatsForm: PlayerStatsFormState = {
-  goals: "0",
-  assists: "0",
-};
+function getTodayDateInput() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getEmptyEntryForm(): StatEntryFormState {
+  return {
+    matchDate: getTodayDateInput(),
+    goals: "0",
+    assists: "0",
+  };
+}
+
+function formatEntryDate(matchDate: string) {
+  const isoDate = matchDate.slice(0, 10);
+
+  return new Date(`${isoDate}T00:00:00`).toLocaleDateString("pt-BR");
+}
 
 const emptyForm: PlayerFormState = {
   name: "",
@@ -103,13 +123,6 @@ function getFormFromPlayer(player: Player): PlayerFormState {
     photoUrl: player.photoUrl ?? "",
     position: player.position,
     type: player.type ?? "MEMBER",
-  };
-}
-
-function getStatsFormFromPlayer(player: Player): PlayerStatsFormState {
-  return {
-    goals: String(player.goals),
-    assists: String(player.assists),
   };
 }
 
@@ -165,9 +178,14 @@ export function PlayersPage() {
   const [formErrorMessage, setFormErrorMessage] = useState("");
 
   const [statsPlayer, setStatsPlayer] = useState<Player | null>(null);
-  const [statsForm, setStatsForm] =
-    useState<PlayerStatsFormState>(emptyStatsForm);
+  const [entryForm, setEntryForm] = useState<StatEntryFormState>(
+    getEmptyEntryForm(),
+  );
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [statEntries, setStatEntries] = useState<PlayerStatEntry[]>([]);
+  const [isLoadingEntries, setIsLoadingEntries] = useState(false);
   const [isSavingStats, setIsSavingStats] = useState(false);
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [statsErrorMessage, setStatsErrorMessage] = useState("");
 
   const [togglingPlayerId, setTogglingPlayerId] = useState<
@@ -283,20 +301,37 @@ export function PlayersPage() {
     }
   };
 
+  const loadStatEntries = async (playerId: string | number) => {
+    setIsLoadingEntries(true);
+
+    try {
+      setStatEntries(await fetchPlayerStatEntries(playerId));
+    } catch {
+      setStatsErrorMessage("Nao foi possivel carregar o historico.");
+    } finally {
+      setIsLoadingEntries(false);
+    }
+  };
+
   const openStatsDialog = (player: Player) => {
     setStatsPlayer(player);
-    setStatsForm(getStatsFormFromPlayer(player));
+    setEntryForm(getEmptyEntryForm());
+    setEditingEntryId(null);
     setStatsErrorMessage("");
+    setStatEntries([]);
+    void loadStatEntries(player.id);
   };
 
   const closeStatsDialog = () => {
-    if (isSavingStats) {
+    if (isSavingStats || deletingEntryId) {
       return;
     }
 
     setStatsPlayer(null);
-    setStatsForm(emptyStatsForm);
+    setEntryForm(getEmptyEntryForm());
+    setEditingEntryId(null);
     setStatsErrorMessage("");
+    setStatEntries([]);
   };
 
   const getStatsNumber = (value: string) => {
@@ -307,77 +342,57 @@ export function PlayersPage() {
     return Number(value);
   };
 
-  const updateStatsField = (
-    field: keyof PlayerStatsFormState,
+  const updateEntryField = (
+    field: keyof StatEntryFormState,
     value: string,
   ) => {
-    if (value === "") {
-      setStatsForm((current) => ({ ...current, [field]: value }));
-      return;
-    }
-
-    const nextValue = Math.min(1000000, Math.max(0, Number(value)));
-
-    if (!Number.isFinite(nextValue)) {
-      return;
-    }
-
-    setStatsForm((current) => ({
-      ...current,
-      [field]: String(Math.trunc(nextValue)),
-    }));
+    setEntryForm((current) => ({ ...current, [field]: value }));
   };
 
-  const stepStatsField = (field: keyof PlayerStatsFormState, delta: number) => {
-    setStatsForm((current) => {
-      const currentValue = getStatsNumber(current[field]);
-      const nextValue = Math.min(1000000, Math.max(0, currentValue + delta));
-
-      return { ...current, [field]: String(nextValue) };
+  const editEntry = (entry: PlayerStatEntry) => {
+    setEditingEntryId(entry.id);
+    setEntryForm({
+      matchDate: entry.matchDate.slice(0, 10),
+      goals: String(entry.goals),
+      assists: String(entry.assists),
     });
+    setStatsErrorMessage("");
   };
 
-  const shouldConfirmStatsReduction = (
-    currentPlayer: Player,
-    nextGoals: number,
-    nextAssists: number,
-  ) => {
-    const clearedGoals = currentPlayer.goals > 0 && nextGoals === 0;
-    const clearedAssists = currentPlayer.assists > 0 && nextAssists === 0;
-    const reducedGoalsALot = currentPlayer.goals - nextGoals >= 10;
-    const reducedAssistsALot = currentPlayer.assists - nextAssists >= 10;
-
-    return (
-      clearedGoals || clearedAssists || reducedGoalsALot || reducedAssistsALot
-    );
+  const cancelEditEntry = () => {
+    setEditingEntryId(null);
+    setEntryForm(getEmptyEntryForm());
+    setStatsErrorMessage("");
   };
 
-  const saveStats = async () => {
+  const refreshStatsPlayer = async (playerId: string | number) => {
+    const updatedPlayer = await fetchPlayer(playerId);
+    setPlayers((current) => replacePlayer(current, updatedPlayer));
+    setStatsPlayer(updatedPlayer);
+  };
+
+  const submitEntry = async () => {
     if (!statsPlayer) {
       return;
     }
 
-    const goals = getStatsNumber(statsForm.goals);
-    const assists = getStatsNumber(statsForm.assists);
+    if (!entryForm.matchDate) {
+      setStatsErrorMessage("Informe a data do baba.");
+      return;
+    }
+
+    const goals = getStatsNumber(entryForm.goals);
+    const assists = getStatsNumber(entryForm.assists);
 
     if (
       !Number.isInteger(goals) ||
       !Number.isInteger(assists) ||
       goals < 0 ||
-      assists < 0 ||
-      goals > 1000000 ||
-      assists > 1000000
+      assists < 0
     ) {
       setStatsErrorMessage(
-        "Gols e assistências devem ser inteiros entre 0 e 1.000.000.",
+        "Gols e assistências devem ser inteiros maiores ou iguais a zero.",
       );
-      return;
-    }
-
-    if (
-      shouldConfirmStatsReduction(statsPlayer, goals, assists) &&
-      !window.confirm("Confirmar reducao grande ou zerar estatísticas?")
-    ) {
       return;
     }
 
@@ -385,19 +400,67 @@ export function PlayersPage() {
     setStatsErrorMessage("");
 
     try {
-      const updatedPlayer = await updatePlayerStats(statsPlayer.id, {
-        goals,
-        assists,
-      });
+      if (editingEntryId) {
+        await updateStatEntry(editingEntryId, {
+          matchDate: entryForm.matchDate,
+          goals,
+          assists,
+        });
+        showSnackbar("Lançamento atualizado com sucesso.");
+      } else {
+        await createPlayerStatEntry(statsPlayer.id, {
+          matchDate: entryForm.matchDate,
+          goals,
+          assists,
+        });
+        showSnackbar("Baba lançado com sucesso.");
+      }
 
-      setPlayers((current) => replacePlayer(current, updatedPlayer));
-      showSnackbar("Estatísticas atualizadas com sucesso.");
-      setStatsPlayer(null);
-      setStatsForm(emptyStatsForm);
+      setEditingEntryId(null);
+      setEntryForm(getEmptyEntryForm());
+      await Promise.all([
+        loadStatEntries(statsPlayer.id),
+        refreshStatsPlayer(statsPlayer.id),
+      ]);
     } catch {
-      setStatsErrorMessage("Nao foi possivel salvar as estatísticas.");
+      setStatsErrorMessage("Nao foi possivel salvar o lançamento.");
     } finally {
       setIsSavingStats(false);
+    }
+  };
+
+  const removeEntry = async (entry: PlayerStatEntry) => {
+    if (!statsPlayer) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Remover este lançamento? Essa ação nao pode ser desfeita.",
+      )
+    ) {
+      return;
+    }
+
+    setDeletingEntryId(entry.id);
+
+    try {
+      await deleteStatEntry(entry.id);
+
+      if (editingEntryId === entry.id) {
+        setEditingEntryId(null);
+        setEntryForm(getEmptyEntryForm());
+      }
+
+      showSnackbar("Lançamento removido.");
+      await Promise.all([
+        loadStatEntries(statsPlayer.id),
+        refreshStatsPlayer(statsPlayer.id),
+      ]);
+    } catch {
+      showSnackbar("Nao foi possivel remover o lançamento.", "error");
+    } finally {
+      setDeletingEntryId(null);
     }
   };
 
@@ -587,12 +650,12 @@ export function PlayersPage() {
                         />
                       </Stack>
                     </Stack>
-                    <Tooltip title="Atualizar estatísticas">
+                    <Tooltip title="Lançar baba">
                       <IconButton
                         color="primary"
                         onClick={() => openStatsDialog(player)}
                         disabled={isToggling}
-                        aria-label={`Atualizar gols e assistências de ${player.name}`}
+                        aria-label={`Lançar gols e assistências de ${player.name}`}
                       >
                         <SportsSoccerOutlinedIcon />
                       </IconButton>
@@ -779,7 +842,7 @@ export function PlayersPage() {
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Atualizar estatísticas</DialogTitle>
+        <DialogTitle>Lançar baba</DialogTitle>
         <DialogContent>
           {statsPlayer ? (
             <Stack spacing={2.25} sx={{ pt: 1 }}>
@@ -800,7 +863,7 @@ export function PlayersPage() {
                     {statsPlayer.name}
                   </Typography>
                   <Typography color="text.secondary">
-                    Atual: {statsPlayer.goals} gol
+                    Total: {statsPlayer.goals} gol
                     {statsPlayer.goals === 1 ? "" : "s"} e {statsPlayer.assists}{" "}
                     assist{statsPlayer.assists === 1 ? "" : "s"}
                   </Typography>
@@ -813,124 +876,156 @@ export function PlayersPage() {
 
               <Divider />
 
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                  gap: 2,
-                }}
-              >
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: "#f7faf8" }}>
-                  <Stack spacing={1.5}>
-                    <Typography sx={{ fontWeight: 900 }}>Gols</Typography>
-                    <TextField
-                      type="number"
-                      value={statsForm.goals}
-                      onChange={(event) =>
-                        updateStatsField("goals", event.target.value)
-                      }
-                      slotProps={{
-                        htmlInput: { min: 0, max: 1000000, step: 1 },
-                      }}
+              <Stack spacing={1.5}>
+                <Typography sx={{ fontWeight: 900 }}>
+                  {editingEntryId ? "Editar lançamento" : "Novo lançamento"}
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                  <TextField
+                    label="Data"
+                    type="date"
+                    value={entryForm.matchDate}
+                    onChange={(event) =>
+                      updateEntryField("matchDate", event.target.value)
+                    }
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Gols"
+                    type="number"
+                    value={entryForm.goals}
+                    onChange={(event) =>
+                      updateEntryField("goals", event.target.value)
+                    }
+                    slotProps={{ htmlInput: { min: 0, max: 50, step: 1 } }}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Assistências"
+                    type="number"
+                    value={entryForm.assists}
+                    onChange={(event) =>
+                      updateEntryField("assists", event.target.value)
+                    }
+                    slotProps={{ htmlInput: { min: 0, max: 50, step: 1 } }}
+                    fullWidth
+                  />
+                </Stack>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  <Button
+                    variant="contained"
+                    onClick={() => void submitEntry()}
+                    disabled={isSavingStats}
+                    startIcon={
+                      isSavingStats ? (
+                        <CircularProgress color="inherit" size={18} />
+                      ) : editingEntryId ? (
+                        <SaveOutlinedIcon />
+                      ) : (
+                        <AddOutlinedIcon />
+                      )
+                    }
+                    fullWidth
+                  >
+                    {editingEntryId ? "Salvar alteração" : "Lançar"}
+                  </Button>
+                  {editingEntryId ? (
+                    <Button
+                      variant="outlined"
+                      onClick={cancelEditEntry}
+                      disabled={isSavingStats}
                       fullWidth
-                    />
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        variant="outlined"
-                        size="large"
-                        onClick={() => stepStatsField("goals", -1)}
-                        disabled={
-                          isSavingStats || getStatsNumber(statsForm.goals) <= 0
-                        }
-                        fullWidth
-                        aria-label="Diminuir um gol"
-                      >
-                        -1
-                      </Button>
-                      <Button
-                        variant="contained"
-                        size="large"
-                        onClick={() => stepStatsField("goals", 1)}
-                        disabled={
-                          isSavingStats ||
-                          getStatsNumber(statsForm.goals) >= 1000000
-                        }
-                        fullWidth
-                        aria-label="Adicionar um gol"
-                      >
-                        +1
-                      </Button>
-                    </Stack>
-                  </Stack>
-                </Paper>
+                    >
+                      Cancelar edição
+                    </Button>
+                  ) : null}
+                </Stack>
+              </Stack>
 
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: "#f7faf8" }}>
-                  <Stack spacing={1.5}>
-                    <Typography sx={{ fontWeight: 900 }}>
-                      Assistências
-                    </Typography>
-                    <TextField
-                      type="number"
-                      value={statsForm.assists}
-                      onChange={(event) =>
-                        updateStatsField("assists", event.target.value)
-                      }
-                      slotProps={{
-                        htmlInput: { min: 0, max: 1000000, step: 1 },
-                      }}
-                      fullWidth
-                    />
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        variant="outlined"
-                        size="large"
-                        onClick={() => stepStatsField("assists", -1)}
-                        disabled={
-                          isSavingStats ||
-                          getStatsNumber(statsForm.assists) <= 0
-                        }
-                        fullWidth
-                        aria-label="Diminuir uma assistencia"
-                      >
-                        -1
-                      </Button>
-                      <Button
-                        variant="contained"
-                        size="large"
-                        onClick={() => stepStatsField("assists", 1)}
-                        disabled={
-                          isSavingStats ||
-                          getStatsNumber(statsForm.assists) >= 1000000
-                        }
-                        fullWidth
-                        aria-label="Adicionar uma assistencia"
-                      >
-                        +1
-                      </Button>
-                    </Stack>
+              <Divider />
+
+              <Stack spacing={1}>
+                <Typography sx={{ fontWeight: 900 }}>Histórico</Typography>
+                {isLoadingEntries ? (
+                  <Stack sx={{ alignItems: "center", py: 3 }}>
+                    <CircularProgress size={24} />
                   </Stack>
-                </Paper>
-              </Box>
+                ) : statEntries.length === 0 ? (
+                  <Typography color="text.secondary">
+                    Nenhum lançamento ainda.
+                  </Typography>
+                ) : (
+                  <Stack
+                    spacing={0.75}
+                    sx={{ maxHeight: 260, overflowY: "auto", pr: 0.5 }}
+                  >
+                    {statEntries.map((entry) => (
+                      <Stack
+                        key={entry.id}
+                        direction="row"
+                        spacing={1}
+                        sx={{
+                          alignItems: "center",
+                          border: "1px solid",
+                          borderColor: "divider",
+                          borderRadius: 1.5,
+                          p: 1,
+                        }}
+                      >
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 700 }} noWrap>
+                            {formatEntryDate(entry.matchDate)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {entry.goals} gol{entry.goals === 1 ? "" : "s"} ·{" "}
+                            {entry.assists} assist
+                            {entry.assists === 1 ? "" : "s"}
+                          </Typography>
+                        </Box>
+                        <Tooltip title="Editar lançamento">
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => editEntry(entry)}
+                              disabled={Boolean(deletingEntryId)}
+                              aria-label={`Editar lançamento de ${formatEntryDate(entry.matchDate)}`}
+                            >
+                              <EditOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Remover lançamento">
+                          <span>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => void removeEntry(entry)}
+                              disabled={deletingEntryId === entry.id}
+                              aria-label={`Remover lançamento de ${formatEntryDate(entry.matchDate)}`}
+                            >
+                              {deletingEntryId === entry.id ? (
+                                <CircularProgress size={16} color="inherit" />
+                              ) : (
+                                <DeleteOutlineOutlinedIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Stack>
+                    ))}
+                  </Stack>
+                )}
+              </Stack>
             </Stack>
           ) : null}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={closeStatsDialog} disabled={isSavingStats}>
-            Cancelar
-          </Button>
           <Button
-            variant="contained"
-            onClick={() => void saveStats()}
-            disabled={isSavingStats}
-            startIcon={
-              isSavingStats ? (
-                <CircularProgress color="inherit" size={18} />
-              ) : (
-                <SaveOutlinedIcon />
-              )
-            }
+            onClick={closeStatsDialog}
+            disabled={isSavingStats || Boolean(deletingEntryId)}
           >
-            Salvar estatísticas
+            Fechar
           </Button>
         </DialogActions>
       </Dialog>

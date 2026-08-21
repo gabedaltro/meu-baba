@@ -9,6 +9,8 @@ export type RankingFilters = {
   status: RankingStatus
   type?: PlayerType | null
   search?: string | null
+  startDate?: string | null
+  endDate?: string | null
 }
 
 export type RankingPlayer = {
@@ -32,6 +34,8 @@ export type RankingResponse = {
     status: RankingStatus
     type: PlayerType | null
     search: string | null
+    startDate: string | null
+    endDate: string | null
   }
   ranking: RankingPlayer[]
 }
@@ -44,6 +48,8 @@ export async function fetchPlayerRankings(filters: RankingFilters) {
       status: filters.status,
       type: filters.type || undefined,
       search: filters.search || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined,
     },
   })
 

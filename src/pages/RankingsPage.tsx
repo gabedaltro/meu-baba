@@ -65,6 +65,10 @@ function getTypeFromParams(value: string | null): PlayerType | null {
   return value === "GUEST" ? "GUEST" : "MEMBER";
 }
 
+function getDateFromParams(value: string | null) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
 function getPlayerDisplayName(player: RankingPlayer) {
   return player.nickname ? `${player.name} (${player.nickname})` : player.name;
 }
@@ -304,6 +308,8 @@ export function RankingsPage() {
       status: getStatusFromParams(searchParams.get("status")),
       type: getTypeFromParams(searchParams.get("type")),
       search: searchParams.get("search")?.trim() || null,
+      startDate: getDateFromParams(searchParams.get("startDate")),
+      endDate: getDateFromParams(searchParams.get("endDate")),
     }),
     [searchParams],
   );
@@ -481,7 +487,8 @@ export function RankingsPage() {
               display: "grid",
               gridTemplateColumns: {
                 xs: "1fr",
-                md: "2fr repeat(2, minmax(120px, 1fr))",
+                sm: "repeat(2, minmax(120px, 1fr))",
+                md: "2fr repeat(4, minmax(120px, 1fr))",
               },
               gap: 1.5,
             }}
@@ -490,6 +497,7 @@ export function RankingsPage() {
               value={filters.search ?? ""}
               onChange={(event) => updateFilter("search", event.target.value)}
               placeholder="Buscar por nome ou apelido"
+              sx={{ gridColumn: { xs: "1", sm: "1 / -1", md: "auto" } }}
               slotProps={{
                 input: {
                   startAdornment: (
@@ -527,6 +535,20 @@ export function RankingsPage() {
               <MenuItem value="ALL">Todos</MenuItem>
               <MenuItem value="INACTIVE">Inativos</MenuItem>
             </Select>
+            <TextField
+              label="De"
+              type="date"
+              value={filters.startDate ?? ""}
+              onChange={(event) => updateFilter("startDate", event.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              label="Até"
+              type="date"
+              value={filters.endDate ?? ""}
+              onChange={(event) => updateFilter("endDate", event.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
           </Box>
         </AccordionDetails>
       </Accordion>

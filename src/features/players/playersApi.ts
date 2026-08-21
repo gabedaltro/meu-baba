@@ -29,9 +29,28 @@ export type PlayerPayload = {
   type?: PlayerType | null
 }
 
-export type PlayerStatsPayload = {
+export type PlayerStatEntry = {
+  id: string
+  playerId: string
+  matchDate: string
+  goals: number
+  assists: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type PlayerStatEntryPayload = {
+  matchDate: string
   goals?: number
   assists?: number
+}
+
+export type PlayerStatEntryUpdatePayload = Partial<PlayerStatEntryPayload>
+
+export type StatEntryFilters = {
+  playerId?: string | number
+  startDate?: string | null
+  endDate?: string | null
 }
 
 type PlayersResponse = Player[] | { data: Player[] }
@@ -92,13 +111,63 @@ export async function updatePlayer(playerId: string | number, payload: Partial<P
   return response.data
 }
 
-export async function updatePlayerStats(
+export async function createPlayerStatEntry(
   playerId: string | number,
-  payload: PlayerStatsPayload,
+  payload: PlayerStatEntryPayload,
 ) {
-  const response = await apiClient.patch<Player>(`/players/${playerId}/stats`, payload)
+  const response = await apiClient.post<PlayerStatEntry>(
+    `/players/${playerId}/stat-entries`,
+    payload,
+  )
 
   return response.data
+}
+
+export async function fetchPlayerStatEntries(
+  playerId: string | number,
+  filters?: { startDate?: string | null; endDate?: string | null },
+) {
+  const response = await apiClient.get<PlayerStatEntry[]>(
+    `/players/${playerId}/stat-entries`,
+    {
+      skipAuth: true,
+      params: {
+        startDate: filters?.startDate || undefined,
+        endDate: filters?.endDate || undefined,
+      },
+    },
+  )
+
+  return response.data
+}
+
+export async function fetchStatEntries(filters?: StatEntryFilters) {
+  const response = await apiClient.get<PlayerStatEntry[]>('/stat-entries', {
+    skipAuth: true,
+    params: {
+      playerId: filters?.playerId ?? undefined,
+      startDate: filters?.startDate || undefined,
+      endDate: filters?.endDate || undefined,
+    },
+  })
+
+  return response.data
+}
+
+export async function updateStatEntry(
+  entryId: string,
+  payload: PlayerStatEntryUpdatePayload,
+) {
+  const response = await apiClient.patch<PlayerStatEntry>(
+    `/stat-entries/${entryId}`,
+    payload,
+  )
+
+  return response.data
+}
+
+export async function deleteStatEntry(entryId: string) {
+  await apiClient.delete(`/stat-entries/${entryId}`)
 }
 
 export async function deactivatePlayer(playerId: string | number) {
