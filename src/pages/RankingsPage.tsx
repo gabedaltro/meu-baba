@@ -425,10 +425,6 @@ export function RankingsPage() {
             >
               Rankings do Baba
             </Typography>
-            <Typography sx={{ color: "rgba(255,255,255,0.76)", maxWidth: 720 }}>
-              Veja quem lidera em gols e assistências. Ranking público,
-              atualizado pela API.
-            </Typography>
           </Box>
           <ToggleButtonGroup
             exclusive

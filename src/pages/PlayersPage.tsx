@@ -396,6 +396,13 @@ export function PlayersPage() {
       return;
     }
 
+    if (goals === 0 && assists === 0) {
+      setStatsErrorMessage(
+        "Informe pelo menos um gol ou uma assistência para lançar.",
+      );
+      return;
+    }
+
     setIsSavingStats(true);
     setStatsErrorMessage("");
 
@@ -916,7 +923,11 @@ export function PlayersPage() {
                   <Button
                     variant="contained"
                     onClick={() => void submitEntry()}
-                    disabled={isSavingStats}
+                    disabled={
+                      isSavingStats ||
+                      (getStatsNumber(entryForm.goals) === 0 &&
+                        getStatsNumber(entryForm.assists) === 0)
+                    }
                     startIcon={
                       isSavingStats ? (
                         <CircularProgress color="inherit" size={18} />
