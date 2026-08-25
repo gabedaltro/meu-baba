@@ -178,9 +178,8 @@ export function PlayersPage() {
   const [formErrorMessage, setFormErrorMessage] = useState("");
 
   const [statsPlayer, setStatsPlayer] = useState<Player | null>(null);
-  const [entryForm, setEntryForm] = useState<StatEntryFormState>(
-    getEmptyEntryForm(),
-  );
+  const [entryForm, setEntryForm] =
+    useState<StatEntryFormState>(getEmptyEntryForm());
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [statEntries, setStatEntries] = useState<PlayerStatEntry[]>([]);
   const [isLoadingEntries, setIsLoadingEntries] = useState(false);
@@ -219,7 +218,7 @@ export function PlayersPage() {
       setPlayers(await fetchPlayers());
       setLoadErrorMessage("");
     } catch {
-      setLoadErrorMessage("Nao foi possivel carregar os jogadores.");
+      setLoadErrorMessage("Não foi possível carregar os jogadores.");
     }
   };
 
@@ -234,7 +233,7 @@ export function PlayersPage() {
       })
       .catch(() => {
         if (isMounted) {
-          setLoadErrorMessage("Nao foi possivel carregar os jogadores.");
+          setLoadErrorMessage("Não foi possível carregar os jogadores.");
         }
       })
       .finally(() => {
@@ -295,7 +294,7 @@ export function PlayersPage() {
 
       setIsFormDialogOpen(false);
     } catch {
-      setFormErrorMessage("Nao foi possivel salvar o jogador.");
+      setFormErrorMessage("Não foi possível salvar o jogador.");
     } finally {
       setIsSaving(false);
     }
@@ -307,7 +306,7 @@ export function PlayersPage() {
     try {
       setStatEntries(await fetchPlayerStatEntries(playerId));
     } catch {
-      setStatsErrorMessage("Nao foi possivel carregar o historico.");
+      setStatsErrorMessage("Não foi possível carregar o historico.");
     } finally {
       setIsLoadingEntries(false);
     }
@@ -342,10 +341,7 @@ export function PlayersPage() {
     return Number(value);
   };
 
-  const updateEntryField = (
-    field: keyof StatEntryFormState,
-    value: string,
-  ) => {
+  const updateEntryField = (field: keyof StatEntryFormState, value: string) => {
     setEntryForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -430,7 +426,7 @@ export function PlayersPage() {
         refreshStatsPlayer(statsPlayer.id),
       ]);
     } catch {
-      setStatsErrorMessage("Nao foi possivel salvar o lançamento.");
+      setStatsErrorMessage("Não foi possível salvar o lançamento.");
     } finally {
       setIsSavingStats(false);
     }
@@ -443,7 +439,7 @@ export function PlayersPage() {
 
     if (
       !window.confirm(
-        "Remover este lançamento? Essa ação nao pode ser desfeita.",
+        "Remover este lançamento? Essa ação não pode ser desfeita.",
       )
     ) {
       return;
@@ -465,7 +461,7 @@ export function PlayersPage() {
         refreshStatsPlayer(statsPlayer.id),
       ]);
     } catch {
-      showSnackbar("Nao foi possivel remover o lançamento.", "error");
+      showSnackbar("Não foi possível remover o lançamento.", "error");
     } finally {
       setDeletingEntryId(null);
     }
@@ -484,7 +480,7 @@ export function PlayersPage() {
         updatedPlayer.isActive ? "Jogador reativado." : "Jogador inativado.",
       );
     } catch {
-      showSnackbar("Nao foi possivel alterar o status do jogador.", "error");
+      showSnackbar("Não foi possível alterar o status do jogador.", "error");
     } finally {
       setTogglingPlayerId(null);
     }
@@ -748,7 +744,7 @@ export function PlayersPage() {
             />
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField
-                label="Numero"
+                label="Número"
                 type="number"
                 value={form.jerseyNumber}
                 onChange={(event) =>
