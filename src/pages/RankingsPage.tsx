@@ -179,7 +179,7 @@ function PodiumCard({
             <Typography color="text.secondary" variant="body2">
               {player.jerseyNumber
                 ? `Camisa #${player.jerseyNumber}`
-                : "Sem numero"}
+                : "Sem número"}
             </Typography>
           </Box>
         </Stack>
@@ -650,11 +650,11 @@ export function RankingsPage() {
             >
               <Stack spacing={1.1}>
                 <Typography variant="h3" sx={{ px: 0.5 }}>
-                  Classificacao completa
+                  Classificação completa
                 </Typography>
                 {remainingPlayers.length === 0 ? (
                   <Typography color="text.secondary" sx={{ px: 0.5, pb: 1 }}>
-                    O ranking atual tem apenas os jogadores do podio.
+                    O ranking atual tem apenas os jogadores do pódio.
                   </Typography>
                 ) : (
                   remainingPlayers.map((player) => (
