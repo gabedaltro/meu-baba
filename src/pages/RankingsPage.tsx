@@ -12,6 +12,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   InputAdornment,
   MenuItem,
   Paper,
@@ -34,10 +35,11 @@ import {
   type RankingFilters,
   type RankingMetric,
   type RankingPlayer,
-  type RankingResponse,
   type RankingStatus,
 } from "../features/rankings/rankingsApi";
 import type { PlayerType } from "../features/players/playersApi";
+
+const RANKING_PAGE_SIZE = 10;
 
 const metricLabels: Record<RankingMetric, { label: string; short: string }> = {
   GOALS: { label: "Gols", short: "G" },
@@ -300,10 +302,12 @@ export function RankingsPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { isAuthenticated, isSessionLoading } = useAuth();
   const canFilterByDate = isAuthenticated && !isSessionLoading;
-  const [rankingResponse, setRankingResponse] =
-    useState<RankingResponse | null>(null);
+  const [entries, setEntries] = useState<RankingPlayer[]>([]);
+  const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [loadMoreErrorMessage, setLoadMoreErrorMessage] = useState("");
 
   const filters = useMemo<RankingFilters>(
     () => ({
@@ -336,12 +340,18 @@ export function RankingsPage() {
   };
 
   const loadRankings = () => {
-    fetchPlayerRankings(filters)
+    setIsLoading(true);
+    setErrorMessage("");
+    setLoadMoreErrorMessage("");
+
+    fetchPlayerRankings({ ...filters, offset: 0, limit: RANKING_PAGE_SIZE })
       .then((response) => {
-        setRankingResponse(response);
+        setEntries(response.ranking);
+        setHasMore(response.hasMore);
       })
       .catch(() => {
-        setRankingResponse(null);
+        setEntries([]);
+        setHasMore(false);
         setErrorMessage("Não foi possível carregar o ranking agora.");
       })
       .finally(() => {
@@ -352,15 +362,17 @@ export function RankingsPage() {
   useEffect(() => {
     let isMounted = true;
 
-    fetchPlayerRankings(filters)
+    fetchPlayerRankings({ ...filters, offset: 0, limit: RANKING_PAGE_SIZE })
       .then((response) => {
         if (isMounted) {
-          setRankingResponse(response);
+          setEntries(response.ranking);
+          setHasMore(response.hasMore);
         }
       })
       .catch(() => {
         if (isMounted) {
-          setRankingResponse(null);
+          setEntries([]);
+          setHasMore(false);
           setErrorMessage("Não foi possível carregar o ranking agora.");
         }
       })
@@ -375,9 +387,29 @@ export function RankingsPage() {
     };
   }, [filters]);
 
-  const ranking = rankingResponse?.ranking ?? [];
-  const podium = ranking.slice(0, 3);
-  const remainingPlayers = ranking.slice(3);
+  const loadMoreRankings = () => {
+    setIsLoadingMore(true);
+    setLoadMoreErrorMessage("");
+
+    fetchPlayerRankings({
+      ...filters,
+      offset: entries.length,
+      limit: RANKING_PAGE_SIZE,
+    })
+      .then((response) => {
+        setEntries((current) => [...current, ...response.ranking]);
+        setHasMore(response.hasMore);
+      })
+      .catch(() => {
+        setLoadMoreErrorMessage("Não foi possível carregar mais jogadores.");
+      })
+      .finally(() => {
+        setIsLoadingMore(false);
+      });
+  };
+
+  const podium = entries.slice(0, 3);
+  const remainingPlayers = entries.slice(3);
 
   return (
     <Stack spacing={{ xs: 2.5, md: 4 }} sx={{ pb: 5 }}>
@@ -600,7 +632,7 @@ export function RankingsPage() {
             <PodiumSkeleton />
             <PodiumSkeleton />
           </Box>
-        ) : ranking.length === 0 ? (
+        ) : entries.length === 0 ? (
           <Paper
             variant="outlined"
             sx={{ p: { xs: 3, sm: 5 }, textAlign: "center" }}
@@ -667,6 +699,30 @@ export function RankingsPage() {
                 )}
               </Stack>
             </Paper>
+
+            {hasMore ? (
+              <Stack spacing={1} sx={{ alignItems: "center" }}>
+                {loadMoreErrorMessage ? (
+                  <Alert severity="error" sx={{ width: "100%" }}>
+                    {loadMoreErrorMessage}
+                  </Alert>
+                ) : null}
+                <Button
+                  variant="outlined"
+                  onClick={loadMoreRankings}
+                  disabled={isLoadingMore}
+                  startIcon={
+                    isLoadingMore ? (
+                      <CircularProgress size={18} />
+                    ) : (
+                      <EmojiEventsOutlinedIcon />
+                    )
+                  }
+                >
+                  {isLoadingMore ? "Carregando..." : "Ver mais"}
+                </Button>
+              </Stack>
+            ) : null}
           </>
         )}
       </Stack>

@@ -11,6 +11,8 @@ export type RankingFilters = {
   search?: string | null
   startDate?: string | null
   endDate?: string | null
+  offset?: number
+  limit?: number
 }
 
 export type RankingPlayer = {
@@ -30,7 +32,10 @@ export type RankingPlayer = {
 export type RankingResponse = {
   metric: RankingMetric
   total: number
+  hasMore: boolean
   filters: {
+    limit: number
+    offset: number
     status: RankingStatus
     type: PlayerType | null
     search: string | null
@@ -50,6 +55,8 @@ export async function fetchPlayerRankings(filters: RankingFilters) {
       search: filters.search || undefined,
       startDate: filters.startDate || undefined,
       endDate: filters.endDate || undefined,
+      offset: filters.offset || undefined,
+      limit: filters.limit || undefined,
     },
   })
 
