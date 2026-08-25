@@ -28,6 +28,7 @@ import {
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useAuth } from "../features/auth/authContext";
 import {
   fetchPlayerRankings,
   type RankingFilters,
@@ -297,6 +298,8 @@ export function RankingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const { isAuthenticated, isSessionLoading } = useAuth();
+  const canFilterByDate = isAuthenticated && !isSessionLoading;
   const [rankingResponse, setRankingResponse] =
     useState<RankingResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -308,10 +311,14 @@ export function RankingsPage() {
       status: getStatusFromParams(searchParams.get("status")),
       type: getTypeFromParams(searchParams.get("type")),
       search: searchParams.get("search")?.trim() || null,
-      startDate: getDateFromParams(searchParams.get("startDate")),
-      endDate: getDateFromParams(searchParams.get("endDate")),
+      startDate: canFilterByDate
+        ? getDateFromParams(searchParams.get("startDate"))
+        : null,
+      endDate: canFilterByDate
+        ? getDateFromParams(searchParams.get("endDate"))
+        : null,
     }),
-    [searchParams],
+    [searchParams, canFilterByDate],
   );
 
   const updateFilter = (
@@ -484,7 +491,9 @@ export function RankingsPage() {
               gridTemplateColumns: {
                 xs: "1fr",
                 sm: "repeat(2, minmax(120px, 1fr))",
-                md: "2fr repeat(4, minmax(120px, 1fr))",
+                md: canFilterByDate
+                  ? "2fr repeat(4, minmax(120px, 1fr))"
+                  : "2fr repeat(2, minmax(120px, 1fr))",
               },
               gap: 1.5,
             }}
@@ -531,20 +540,28 @@ export function RankingsPage() {
               <MenuItem value="ALL">Todos</MenuItem>
               <MenuItem value="INACTIVE">Inativos</MenuItem>
             </Select>
-            <TextField
-              label="De"
-              type="date"
-              value={filters.startDate ?? ""}
-              onChange={(event) => updateFilter("startDate", event.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
-            <TextField
-              label="Até"
-              type="date"
-              value={filters.endDate ?? ""}
-              onChange={(event) => updateFilter("endDate", event.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-            />
+            {canFilterByDate ? (
+              <>
+                <TextField
+                  label="De"
+                  type="date"
+                  value={filters.startDate ?? ""}
+                  onChange={(event) =>
+                    updateFilter("startDate", event.target.value)
+                  }
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+                <TextField
+                  label="Até"
+                  type="date"
+                  value={filters.endDate ?? ""}
+                  onChange={(event) =>
+                    updateFilter("endDate", event.target.value)
+                  }
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+              </>
+            ) : null}
           </Box>
         </AccordionDetails>
       </Accordion>
