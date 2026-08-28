@@ -2,6 +2,7 @@ import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
+import MilitaryTechOutlinedIcon from "@mui/icons-material/MilitaryTechOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
 import { Box, Button, Container, Stack } from "@mui/material";
@@ -15,6 +16,9 @@ import {
 } from "react-router-dom";
 import { useAuth } from "../features/auth/authContext";
 import { LoginPage } from "../pages/LoginPage";
+import { MatchDayCreatePage } from "../pages/MatchDayCreatePage";
+import { MatchDayDetailPage } from "../pages/MatchDayDetailPage";
+import { MatchDaysPage } from "../pages/MatchDaysPage";
 import { PlayersPage } from "../pages/PlayersPage";
 import { RankingsPage } from "../pages/RankingsPage";
 import { SettingsPage } from "../pages/SettingsPage";
@@ -25,6 +29,11 @@ import { ProtectedRoute } from "./ProtectedRoute";
 const navItems = [
   { label: "Rankings", path: "/rankings", icon: <EmojiEventsOutlinedIcon /> },
   { label: "Sorteio", path: "/sorteio", icon: <ShuffleOutlinedIcon /> },
+  {
+    label: "Times da semana",
+    path: "/rodadas",
+    icon: <MilitaryTechOutlinedIcon />,
+  },
   {
     label: "Jogadores",
     path: "/jogadores",
@@ -150,6 +159,30 @@ export function AppRoutes() {
         }
       />
       <Route path="/ranking" element={<Navigate to="/rankings" replace />} />
+      <Route
+        path="/rodadas"
+        element={
+          <PublicPage>
+            <MatchDaysPage />
+          </PublicPage>
+        }
+      />
+      <Route
+        path="/rodadas/nova"
+        element={
+          <ProtectedPage>
+            <MatchDayCreatePage />
+          </ProtectedPage>
+        }
+      />
+      <Route
+        path="/rodadas/:matchDayId"
+        element={
+          <PublicPage>
+            <MatchDayDetailPage />
+          </PublicPage>
+        }
+      />
       <Route
         path="/sorteio"
         element={
