@@ -7,15 +7,24 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Grid,
   Paper,
   Snackbar,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
+import axios from "axios";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../features/auth/authContext";
+import { getTodayDateInput } from "../features/matchDays/format";
+import { saveDrawAsMatchDay } from "../features/matchDays/matchDaysApi";
 import { fetchSettings } from "../features/settings/settingsApi";
 import { DrawConfigCard } from "../features/teamDraw/components/DrawConfigCard";
 import { DrawMatchModal } from "../features/teamDraw/components/DrawMatchModal";
@@ -246,6 +255,7 @@ async function copyTextToClipboard(text: string) {
 }
 
 export function TeamDrawPage() {
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [storedDrawState] = useState(() => loadStoredDrawState());
   const [participants, setParticipants] = useState<DrawParticipant[]>([]);
@@ -262,6 +272,13 @@ export function TeamDrawPage() {
   const [isGoalkeeperDialogOpen, setIsGoalkeeperDialogOpen] = useState(false);
   const [kickoffTeamId, setKickoffTeamId] = useState<number | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState("");
+
+  const [currentDrawId, setCurrentDrawId] = useState<string | null>(null);
+  const [isSaveMatchDayDialogOpen, setIsSaveMatchDayDialogOpen] =
+    useState(false);
+  const [matchDayDate, setMatchDayDate] = useState(getTodayDateInput());
+  const [isSavingMatchDay, setIsSavingMatchDay] = useState(false);
+  const [matchDayErrorMessage, setMatchDayErrorMessage] = useState("");
 
   const summary = useMemo(() => {
     const goalkeeperCount = participants.filter(
@@ -504,13 +521,24 @@ export function TeamDrawPage() {
     setIsDrawing(true);
 
     try {
-      const generatedTeams = isAuthenticated
-        ? await createTeamDraw({
-            eventId: drawEventId,
-            maxOutfieldPlayersPerTeam: maxPlayersPerTeam,
-            participants: displayParticipants,
-          })
-        : generateLocalTeams(displayParticipants, maxPlayersPerTeam);
+      let generatedTeams: DrawTeam[];
+
+      if (isAuthenticated) {
+        const draw = await createTeamDraw({
+          eventId: drawEventId,
+          maxOutfieldPlayersPerTeam: maxPlayersPerTeam,
+          participants: displayParticipants,
+        });
+
+        generatedTeams = draw.teams;
+        setCurrentDrawId(draw.id);
+      } else {
+        generatedTeams = generateLocalTeams(
+          displayParticipants,
+          maxPlayersPerTeam,
+        );
+        setCurrentDrawId(null);
+      }
 
       if (generatedTeams.length === 0) {
         setSnackbarMessage("Não foi possível gerar times para este sorteio.");
@@ -572,6 +600,52 @@ export function TeamDrawPage() {
 
   const closeSnackbar = () => {
     setSnackbarMessage("");
+  };
+
+  const openSaveMatchDayDialog = () => {
+    setMatchDayDate(getTodayDateInput());
+    setMatchDayErrorMessage("");
+    setIsSaveMatchDayDialogOpen(true);
+  };
+
+  const closeSaveMatchDayDialog = () => {
+    if (isSavingMatchDay) {
+      return;
+    }
+
+    setIsSaveMatchDayDialogOpen(false);
+    setMatchDayErrorMessage("");
+  };
+
+  const submitSaveMatchDay = async () => {
+    if (!currentDrawId) {
+      return;
+    }
+
+    if (!matchDayDate) {
+      setMatchDayErrorMessage("Informe a data da rodada.");
+      return;
+    }
+
+    setIsSavingMatchDay(true);
+    setMatchDayErrorMessage("");
+
+    try {
+      const matchDay = await saveDrawAsMatchDay(currentDrawId, {
+        date: matchDayDate,
+      });
+
+      setIsSaveMatchDayDialogOpen(false);
+      navigate(`/rodadas/${matchDay.id}`);
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        setMatchDayErrorMessage("Já existe uma rodada cadastrada nessa data.");
+      } else {
+        setMatchDayErrorMessage("Não foi possível salvar a rodada.");
+      }
+    } finally {
+      setIsSavingMatchDay(false);
+    }
   };
 
   const changePlayerStat = (
@@ -771,6 +845,9 @@ export function TeamDrawPage() {
               onCopy={copyTeams}
               onShare={shareTeams}
               onChangePlayerStat={changePlayerStat}
+              onSaveAsMatchDay={
+                currentDrawId ? openSaveMatchDayDialog : undefined
+              }
             />
           </Box>
         </Box>
@@ -799,6 +876,52 @@ export function TeamDrawPage() {
         availablePlayers={registeredPlayers}
         onImport={importGoalkeepers}
       />
+
+      <Dialog
+        open={isSaveMatchDayDialogOpen}
+        onClose={closeSaveMatchDayDialog}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Salvar como rodada</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            {matchDayErrorMessage ? (
+              <Alert severity="error">{matchDayErrorMessage}</Alert>
+            ) : null}
+            <Typography color="text.secondary">
+              Esses times viram a rodada oficial dessa data em "Times da
+              semana".
+            </Typography>
+            <TextField
+              label="Data"
+              type="date"
+              value={matchDayDate}
+              onChange={(event) => setMatchDayDate(event.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+              fullWidth
+              autoFocus
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={closeSaveMatchDayDialog} disabled={isSavingMatchDay}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void submitSaveMatchDay()}
+            disabled={isSavingMatchDay}
+            startIcon={
+              isSavingMatchDay ? (
+                <CircularProgress color="inherit" size={18} />
+              ) : undefined
+            }
+          >
+            Salvar rodada
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Box
         sx={{

@@ -1,6 +1,7 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
+import MilitaryTechOutlinedIcon from '@mui/icons-material/MilitaryTechOutlined'
 import RemoveOutlinedIcon from '@mui/icons-material/RemoveOutlined'
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined'
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined'
@@ -36,6 +37,7 @@ type DrawResultCardProps = {
     stat: 'goals' | 'assists',
     delta: number,
   ) => void
+  onSaveAsMatchDay?: () => void
 }
 
 type PlayerStatControlsProps = {
@@ -293,6 +295,7 @@ export function DrawResultCard({
   onCopy,
   onShare,
   onChangePlayerStat,
+  onSaveAsMatchDay,
 }: DrawResultCardProps) {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
@@ -377,6 +380,20 @@ export function DrawResultCard({
             >
               Compartilhar
             </Button>
+            {onSaveAsMatchDay ? (
+              <Button
+                variant="contained"
+                startIcon={<MilitaryTechOutlinedIcon />}
+                onClick={onSaveAsMatchDay}
+                sx={{
+                  bgcolor: '#ffd54f',
+                  color: '#6b4300',
+                  '&:hover': { bgcolor: '#ffca28' },
+                }}
+              >
+                Salvar como rodada
+              </Button>
+            ) : null}
           </Stack>
         </Stack>
 

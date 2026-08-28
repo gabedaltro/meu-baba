@@ -211,5 +211,8 @@ export async function createTeamDraw({
 
   const response = await apiClient.post<ApiDrawResponse>('/draws', payload)
 
-  return mapApiDrawToTeams(response.data, participants)
+  return {
+    id: response.data.id !== undefined ? String(response.data.id) : null,
+    teams: mapApiDrawToTeams(response.data, participants),
+  }
 }
