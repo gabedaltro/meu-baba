@@ -31,12 +31,13 @@ import {
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
-import { Link as RouterLink, useParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../features/auth/authContext";
 import { formatMatchDayDate } from "../features/matchDays/format";
 import {
   createConfronto,
   deleteConfronto,
+  deleteMatchDay,
   fetchMatchDay,
   setConfrontoPlayerStats,
   setMatchDayCapa,
@@ -268,12 +269,14 @@ function ConfrontoRow({
 }
 
 export function MatchDayDetailPage() {
+  const navigate = useNavigate();
   const { matchDayId } = useParams<{ matchDayId: string }>();
   const { isAuthenticated } = useAuth();
 
   const [matchDay, setMatchDay] = useState<MatchDayDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isDeletingMatchDay, setIsDeletingMatchDay] = useState(false);
 
   const [snackbar, setSnackbar] = useState<SnackbarState>({
     open: false,
@@ -589,6 +592,30 @@ export function MatchDayDetailPage() {
     }
   };
 
+  const removeMatchDay = async () => {
+    if (!matchDayId) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Excluir esta rodada? Isso apaga os confrontos e as estatísticas lançadas nela. Essa ação não pode ser desfeita.",
+      )
+    ) {
+      return;
+    }
+
+    setIsDeletingMatchDay(true);
+
+    try {
+      await deleteMatchDay(matchDayId);
+      navigate("/rodadas");
+    } catch {
+      showSnackbar("Não foi possível excluir a rodada.", "error");
+      setIsDeletingMatchDay(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Stack spacing={2}>
@@ -689,15 +716,42 @@ export function MatchDayDetailPage() {
               )}
             </Stack>
           </Box>
-          <Button
-            component={RouterLink}
-            to="/rodadas"
-            variant="outlined"
-            startIcon={<ArrowBackOutlinedIcon />}
-            sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.55)" }}
-          >
-            Times da semana
-          </Button>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Button
+              component={RouterLink}
+              to="/rodadas"
+              variant="outlined"
+              startIcon={<ArrowBackOutlinedIcon />}
+              sx={{ color: "#fff", borderColor: "rgba(255,255,255,0.55)" }}
+            >
+              Times da semana
+            </Button>
+            {isAuthenticated ? (
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => void removeMatchDay()}
+                disabled={isDeletingMatchDay}
+                startIcon={
+                  isDeletingMatchDay ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : (
+                    <DeleteOutlineOutlinedIcon />
+                  )
+                }
+                sx={{
+                  color: "#ffb4a8",
+                  borderColor: "rgba(255,180,168,0.6)",
+                  "&:hover": {
+                    borderColor: "#ffb4a8",
+                    bgcolor: "rgba(255,180,168,0.08)",
+                  },
+                }}
+              >
+                Excluir rodada
+              </Button>
+            ) : null}
+          </Stack>
         </Stack>
       </Paper>
 

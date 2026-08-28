@@ -188,6 +188,10 @@ export async function setConfrontoPlayerStats(
   return response.data
 }
 
+export async function deleteMatchDay(matchDayId: string) {
+  await apiClient.delete(`/match-days/${matchDayId}`)
+}
+
 export async function setMatchDayCapa(matchDayId: string, teamId: string) {
   const response = await apiClient.patch<MatchDayDetail>(
     `/match-days/${matchDayId}/capa`,
