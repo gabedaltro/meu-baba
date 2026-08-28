@@ -1,7 +1,7 @@
 import { apiClient } from '../../services/apiClient'
 import type { PlayerPosition, PlayerType } from '../players/playersApi'
 
-export type RankingMetric = 'GOALS' | 'ASSISTS'
+export type RankingMetric = 'GOALS' | 'ASSISTS' | 'CAPAS'
 export type RankingStatus = 'ACTIVE' | 'INACTIVE' | 'ALL'
 
 export type RankingFilters = {
@@ -26,6 +26,7 @@ export type RankingPlayer = {
   type: PlayerType | null
   goals: number
   assists: number
+  capas: number
   isActive: boolean
 }
 

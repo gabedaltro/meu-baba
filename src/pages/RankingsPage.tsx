@@ -1,5 +1,6 @@
 import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
 import FilterListOutlinedIcon from "@mui/icons-material/FilterListOutlined";
+import MilitaryTechOutlinedIcon from "@mui/icons-material/MilitaryTechOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import SportsSoccerOutlinedIcon from "@mui/icons-material/SportsSoccerOutlined";
@@ -44,6 +45,7 @@ const RANKING_PAGE_SIZE = 10;
 const metricLabels: Record<RankingMetric, { label: string; short: string }> = {
   GOALS: { label: "Gols", short: "G" },
   ASSISTS: { label: "Assistências", short: "A" },
+  CAPAS: { label: "Capas", short: "C" },
 };
 
 const podiumStyles = [
@@ -53,7 +55,11 @@ const podiumStyles = [
 ];
 
 function getMetricFromParams(value: string | null): RankingMetric {
-  return value === "ASSISTS" ? "ASSISTS" : "GOALS";
+  if (value === "ASSISTS" || value === "CAPAS") {
+    return value;
+  }
+
+  return "GOALS";
 }
 
 function getStatusFromParams(value: string | null): RankingStatus {
@@ -85,7 +91,15 @@ function getPlayerTypeLabel(player: RankingPlayer) {
 }
 
 function getMetricValue(player: RankingPlayer, metric: RankingMetric) {
-  return metric === "GOALS" ? player.goals : player.assists;
+  if (metric === "GOALS") {
+    return player.goals;
+  }
+
+  if (metric === "ASSISTS") {
+    return player.assists;
+  }
+
+  return player.capas;
 }
 
 function getMetricSuffix(metric: RankingMetric, value: number) {
@@ -93,7 +107,11 @@ function getMetricSuffix(metric: RankingMetric, value: number) {
     return value === 1 ? "gol" : "gols";
   }
 
-  return value === 1 ? "assist" : "assists";
+  if (metric === "ASSISTS") {
+    return value === 1 ? "assist" : "assists";
+  }
+
+  return value === 1 ? "capa" : "capas";
 }
 
 function PodiumCard({
@@ -199,6 +217,10 @@ function PodiumCard({
             label={`${player.assists} A`}
             variant={metric === "ASSISTS" ? "filled" : "outlined"}
           />
+          <Chip
+            label={`${player.capas} C`}
+            variant={metric === "CAPAS" ? "filled" : "outlined"}
+          />
         </Stack>
       </Stack>
     </Paper>
@@ -278,6 +300,10 @@ function RankingRow({
           label={`${player.assists} A`}
           variant={metric === "ASSISTS" ? "filled" : "outlined"}
         />
+        <Chip
+          label={`${player.capas} C`}
+          variant={metric === "CAPAS" ? "filled" : "outlined"}
+        />
       </Stack>
     </Stack>
   );
@@ -309,11 +335,16 @@ export function RankingsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [loadMoreErrorMessage, setLoadMoreErrorMessage] = useState("");
 
+  const metric = getMetricFromParams(searchParams.get("metric"));
+  const isCapasMetric = metric === "CAPAS";
+
   const filters = useMemo<RankingFilters>(
     () => ({
-      metric: getMetricFromParams(searchParams.get("metric")),
+      metric,
       status: getStatusFromParams(searchParams.get("status")),
-      type: getTypeFromParams(searchParams.get("type")),
+      type: isCapasMetric
+        ? "MEMBER"
+        : getTypeFromParams(searchParams.get("type")),
       search: searchParams.get("search")?.trim() || null,
       startDate: canFilterByDate
         ? getDateFromParams(searchParams.get("startDate"))
@@ -322,7 +353,7 @@ export function RankingsPage() {
         ? getDateFromParams(searchParams.get("endDate"))
         : null,
     }),
-    [searchParams, canFilterByDate],
+    [searchParams, canFilterByDate, metric, isCapasMetric],
   );
 
   const updateFilter = (
@@ -496,6 +527,10 @@ export function RankingsPage() {
               <EmojiEventsOutlinedIcon sx={{ mr: 1 }} />
               Assistências
             </ToggleButton>
+            <ToggleButton value="CAPAS">
+              <MilitaryTechOutlinedIcon sx={{ mr: 1 }} />
+              Capas
+            </ToggleButton>
           </ToggleButtonGroup>
         </Stack>
       </Paper>
@@ -524,8 +559,8 @@ export function RankingsPage() {
                 xs: "1fr",
                 sm: "repeat(2, minmax(120px, 1fr))",
                 md: canFilterByDate
-                  ? "2fr repeat(4, minmax(120px, 1fr))"
-                  : "2fr repeat(2, minmax(120px, 1fr))",
+                  ? `2fr repeat(${isCapasMetric ? 3 : 4}, minmax(120px, 1fr))`
+                  : `2fr repeat(${isCapasMetric ? 1 : 2}, minmax(120px, 1fr))`,
               },
               gap: 1.5,
             }}
@@ -545,20 +580,22 @@ export function RankingsPage() {
                 },
               }}
             />
-            <Select
-              value={filters.type ?? "ALL"}
-              displayEmpty
-              onChange={(event) =>
-                updateFilter(
-                  "type",
-                  event.target.value === "MEMBER" ? null : event.target.value,
-                )
-              }
-            >
-              <MenuItem value="ALL">Todos tipos</MenuItem>
-              <MenuItem value="MEMBER">Mensalistas</MenuItem>
-              <MenuItem value="GUEST">Convidados</MenuItem>
-            </Select>
+            {isCapasMetric ? null : (
+              <Select
+                value={filters.type ?? "ALL"}
+                displayEmpty
+                onChange={(event) =>
+                  updateFilter(
+                    "type",
+                    event.target.value === "MEMBER" ? null : event.target.value,
+                  )
+                }
+              >
+                <MenuItem value="ALL">Todos tipos</MenuItem>
+                <MenuItem value="MEMBER">Mensalistas</MenuItem>
+                <MenuItem value="GUEST">Convidados</MenuItem>
+              </Select>
+            )}
             <Select
               value={filters.status}
               onChange={(event) =>
