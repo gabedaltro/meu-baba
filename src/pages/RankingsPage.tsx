@@ -43,9 +43,9 @@ import type { PlayerType } from "../features/players/playersApi";
 const RANKING_PAGE_SIZE = 10;
 
 const metricLabels: Record<RankingMetric, { label: string; short: string }> = {
-  GOALS: { label: "Gols", short: "G" },
-  ASSISTS: { label: "Assistências", short: "A" },
-  CAPAS: { label: "Capas", short: "C" },
+  GOALS: { label: "Gols", short: "Gols" },
+  ASSISTS: { label: "Assistências", short: "Assist." },
+  CAPAS: { label: "Capas", short: "Capas" },
 };
 
 const podiumStyles = [
@@ -203,7 +203,12 @@ function PodiumCard({
             </Typography>
           </Box>
         </Stack>
-        <Stack direction="row" spacing={1} sx={{ justifyContent: "center" }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{ justifyContent: "center", flexWrap: "wrap" }}
+        >
           <Chip
             label={`${value} ${getMetricSuffix(metric, value)}`}
             color="primary"
@@ -235,75 +240,131 @@ function RankingRow({
   metric: RankingMetric;
 }) {
   const value = getMetricValue(player, metric);
+  const breakdown = [
+    { key: "GOALS" as const, label: "Gols", count: player.goals },
+    { key: "ASSISTS" as const, label: "Assist.", count: player.assists },
+    { key: "CAPAS" as const, label: "Capas", count: player.capas },
+  ];
 
   return (
     <Stack
       component={motion.article}
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
-      direction="row"
-      spacing={1.25}
+      spacing={1}
       sx={{
-        alignItems: "center",
         border: "1px solid",
         borderColor: "divider",
         bgcolor: "rgba(255,255,255,0.9)",
         borderRadius: 2,
-        p: 1.25,
+        p: { xs: 1, sm: 1.25 },
       }}
     >
-      <Avatar sx={{ bgcolor: "primary.main", color: "#fff", fontWeight: 900 }}>
-        {player.rank}
-      </Avatar>
-      <Avatar src={player.photoUrl ?? undefined} alt={player.name}>
-        {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
-      </Avatar>
-      <Stack sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 900 }} noWrap>
-          {getPlayerDisplayName(player)}
-        </Typography>
-        <Stack
-          direction="row"
-          spacing={0.75}
-          useFlexGap
-          sx={{ flexWrap: "wrap", mt: 0.25 }}
+      <Stack
+        direction="row"
+        spacing={1.25}
+        sx={{ alignItems: "center", minWidth: 0 }}
+      >
+        <Avatar
+          sx={{
+            bgcolor: "primary.main",
+            color: "#fff",
+            fontWeight: 900,
+            flexShrink: 0,
+            width: { xs: 32, sm: 40 },
+            height: { xs: 32, sm: 40 },
+            fontSize: { xs: "0.9rem", sm: "1rem" },
+          }}
         >
-          <Chip label={getPlayerTypeLabel(player)} size="small" />
-          {player.jerseyNumber ? (
+          {player.rank}
+        </Avatar>
+        <Avatar
+          src={player.photoUrl ?? undefined}
+          alt={player.name}
+          sx={{
+            flexShrink: 0,
+            width: { xs: 32, sm: 40 },
+            height: { xs: 32, sm: 40 },
+          }}
+        >
+          {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
+        </Avatar>
+        <Stack sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 900 }} noWrap>
+            {getPlayerDisplayName(player)}
+          </Typography>
+          <Stack
+            direction="row"
+            spacing={0.5}
+            useFlexGap
+            sx={{ flexWrap: "wrap", mt: 0.25 }}
+          >
             <Chip
-              label={`#${player.jerseyNumber}`}
+              label={getPlayerTypeLabel(player)}
               size="small"
-              variant="outlined"
+              sx={{ height: 20 }}
             />
-          ) : null}
-          {!player.isActive ? (
-            <Chip
-              label="Inativo"
-              size="small"
-              color="error"
-              variant="outlined"
-            />
-          ) : null}
+            {player.jerseyNumber ? (
+              <Chip
+                label={`#${player.jerseyNumber}`}
+                size="small"
+                variant="outlined"
+                sx={{ height: 20 }}
+              />
+            ) : null}
+            {!player.isActive ? (
+              <Chip
+                label="Inativo"
+                size="small"
+                color="error"
+                variant="outlined"
+                sx={{ height: 20 }}
+              />
+            ) : null}
+          </Stack>
+        </Stack>
+        <Stack
+          sx={{
+            flexShrink: 0,
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: { xs: 52, sm: 64 },
+            px: 1,
+            py: 0.5,
+            borderRadius: 2,
+            bgcolor: "primary.main",
+            color: "#fff",
+          }}
+        >
+          <Typography
+            sx={{ fontWeight: 900, lineHeight: 1, fontSize: { xs: "1.15rem", sm: "1.35rem" } }}
+          >
+            {value}
+          </Typography>
+          <Typography
+            sx={{ fontWeight: 700, fontSize: "0.6rem", textTransform: "uppercase", opacity: 0.85 }}
+          >
+            {metricLabels[metric].short}
+          </Typography>
         </Stack>
       </Stack>
-      <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
-        <Chip
-          label={`${value} ${metricLabels[metric].short}`}
-          color="primary"
-          sx={{ fontWeight: 900 }}
-        />
-        <Chip
-          label={`${player.goals} G`}
-          variant={metric === "GOALS" ? "filled" : "outlined"}
-        />
-        <Chip
-          label={`${player.assists} A`}
-          variant={metric === "ASSISTS" ? "filled" : "outlined"}
-        />
-        <Chip
-          label={`${player.capas} C`}
-          variant={metric === "CAPAS" ? "filled" : "outlined"}
-        />
+
+      <Stack
+        direction="row"
+        spacing={0.75}
+        useFlexGap
+        sx={{ flexWrap: "wrap", pl: { sm: "52px" } }}
+      >
+        {breakdown.map((item) => (
+          <Chip
+            key={item.key}
+            size="small"
+            label={`${item.count} ${item.label}`}
+            color={metric === item.key ? "primary" : "default"}
+            variant={metric === item.key ? "filled" : "outlined"}
+            sx={{ fontWeight: metric === item.key ? 800 : 500 }}
+          />
+        ))}
       </Stack>
     </Stack>
   );
@@ -498,6 +559,7 @@ export function RankingsPage() {
           </Box>
           <ToggleButtonGroup
             exclusive
+            fullWidth
             value={filters.metric}
             onChange={(_, value: RankingMetric | null) => {
               if (value) {
@@ -507,10 +569,15 @@ export function RankingsPage() {
             sx={{
               bgcolor: "rgba(255,255,255,0.12)",
               borderRadius: 2,
+              width: { xs: "100%", md: "auto" },
+              flexShrink: 0,
               "& .MuiToggleButton-root": {
                 color: "#fff",
                 borderColor: "rgba(255,255,255,0.22)",
-                px: { xs: 2, sm: 3 },
+                px: { xs: 1, sm: 3 },
+                py: { xs: 0.75, sm: 1 },
+                fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                whiteSpace: "nowrap",
                 "&.Mui-selected": {
                   bgcolor: "#fff",
                   color: "primary.dark",
@@ -520,15 +587,29 @@ export function RankingsPage() {
             }}
           >
             <ToggleButton value="GOALS">
-              <SportsSoccerOutlinedIcon sx={{ mr: 1 }} />
+              <SportsSoccerOutlinedIcon
+                fontSize="small"
+                sx={{ mr: { xs: 0.5, sm: 1 } }}
+              />
               Gols
             </ToggleButton>
             <ToggleButton value="ASSISTS">
-              <EmojiEventsOutlinedIcon sx={{ mr: 1 }} />
-              Assistências
+              <EmojiEventsOutlinedIcon
+                fontSize="small"
+                sx={{ mr: { xs: 0.5, sm: 1 }, display: { xs: "none", sm: "block" } }}
+              />
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                Assistências
+              </Box>
+              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                Assist.
+              </Box>
             </ToggleButton>
             <ToggleButton value="CAPAS">
-              <MilitaryTechOutlinedIcon sx={{ mr: 1 }} />
+              <MilitaryTechOutlinedIcon
+                fontSize="small"
+                sx={{ mr: { xs: 0.5, sm: 1 } }}
+              />
               Capas
             </ToggleButton>
           </ToggleButtonGroup>
