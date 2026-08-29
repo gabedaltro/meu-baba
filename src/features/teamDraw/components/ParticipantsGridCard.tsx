@@ -35,6 +35,7 @@ type ParticipantsGridCardProps = {
   participants: DrawParticipant[];
   availablePlayers: DrawParticipant[];
   isLoadingPlayers: boolean;
+  canEdit?: boolean;
   onAdd: (playerIds: string[]) => number;
   onAddMonthlyPlayers: () => void;
   onOpenGoalkeeperImport: () => void;
@@ -66,6 +67,7 @@ export function ParticipantsGridCard({
   participants,
   availablePlayers,
   isLoadingPlayers,
+  canEdit = true,
   onAdd,
   onAddMonthlyPlayers,
   onOpenGoalkeeperImport,
@@ -121,16 +123,19 @@ export function ParticipantsGridCard({
               {participants.length} na lista
             </Typography>
           </Stack>
-          <Button
-            color="error"
-            variant="text"
-            onClick={onClear}
-            disabled={participants.length === 0}
-          >
-            Limpar lista
-          </Button>
+          {canEdit ? (
+            <Button
+              color="error"
+              variant="text"
+              onClick={onClear}
+              disabled={participants.length === 0}
+            >
+              Limpar lista
+            </Button>
+          ) : null}
         </Stack>
 
+        {canEdit ? (
         <Stack spacing={1.5}>
           <Select
             multiple
@@ -246,6 +251,7 @@ export function ParticipantsGridCard({
             </Button>
           </Box>
         </Stack>
+        ) : null}
 
         {participants.length === 0 ? (
           <Stack
@@ -262,8 +268,9 @@ export function ParticipantsGridCard({
               Nenhum jogador informado
             </Typography>
             <Typography color="text.secondary" sx={{ textAlign: "center" }}>
-              Selecione jogadores cadastrados ou adicione convidados para liberar
-              o sorteio.
+              {canEdit
+                ? "Selecione jogadores cadastrados ou adicione convidados para liberar o sorteio."
+                : "A lista da semana ainda não foi montada."}
             </Typography>
           </Stack>
         ) : (
@@ -366,34 +373,40 @@ export function ParticipantsGridCard({
                           ) : null}
                         </Stack>
                       </Stack>
-                      <Tooltip
-                        title={
-                          participant.isLateArrival
-                            ? "Remover chegada atrasada"
-                            : "Marcar chegada atrasada"
-                        }
-                      >
-                        <IconButton
-                          color={participant.isLateArrival ? "warning" : "default"}
-                          aria-label={`${
-                            participant.isLateArrival
-                              ? "Remover chegada atrasada de"
-                              : "Marcar chegada atrasada para"
-                          } ${participant.name}`}
-                          onClick={() => onToggleLateArrival(participant.id)}
-                        >
-                          <ScheduleOutlinedIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Remover jogador">
-                        <IconButton
-                          color="error"
-                          aria-label={`Remover ${participant.name}`}
-                          onClick={() => onRemove(participant.id)}
-                        >
-                          <DeleteOutlineOutlinedIcon />
-                        </IconButton>
-                      </Tooltip>
+                      {canEdit ? (
+                        <>
+                          <Tooltip
+                            title={
+                              participant.isLateArrival
+                                ? "Remover chegada atrasada"
+                                : "Marcar chegada atrasada"
+                            }
+                          >
+                            <IconButton
+                              color={
+                                participant.isLateArrival ? "warning" : "default"
+                              }
+                              aria-label={`${
+                                participant.isLateArrival
+                                  ? "Remover chegada atrasada de"
+                                  : "Marcar chegada atrasada para"
+                              } ${participant.name}`}
+                              onClick={() => onToggleLateArrival(participant.id)}
+                            >
+                              <ScheduleOutlinedIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Remover jogador">
+                            <IconButton
+                              color="error"
+                              aria-label={`Remover ${participant.name}`}
+                              onClick={() => onRemove(participant.id)}
+                            >
+                              <DeleteOutlineOutlinedIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      ) : null}
                     </Stack>
                   </motion.div>
                 );

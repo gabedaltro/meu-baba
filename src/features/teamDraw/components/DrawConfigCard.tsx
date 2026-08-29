@@ -5,13 +5,19 @@ import { Box, IconButton, Stack, TextField, Tooltip, Typography } from '@mui/mat
 type DrawConfigCardProps = {
   maxPlayersPerTeam: number
   onMaxPlayersPerTeamChange: (maxPlayersPerTeam: number) => void
+  canEdit?: boolean
 }
 
 export function DrawConfigCard({
   maxPlayersPerTeam,
   onMaxPlayersPerTeamChange,
+  canEdit = true,
 }: DrawConfigCardProps) {
   const updateValue = (value: number) => {
+    if (!canEdit) {
+      return
+    }
+
     onMaxPlayersPerTeamChange(Math.max(1, value))
   }
 
@@ -37,7 +43,7 @@ export function DrawConfigCard({
             <IconButton
               size="small"
               onClick={() => updateValue(maxPlayersPerTeam - 1)}
-              disabled={maxPlayersPerTeam <= 1}
+              disabled={!canEdit || maxPlayersPerTeam <= 1}
               aria-label="Diminuir jogadores por time"
             >
               <RemoveOutlinedIcon />
@@ -48,6 +54,7 @@ export function DrawConfigCard({
           type="number"
           value={maxPlayersPerTeam}
           onChange={(event) => updateValue(Number(event.target.value || 1))}
+          disabled={!canEdit}
           slotProps={{
             htmlInput: {
               min: 1,
@@ -61,13 +68,16 @@ export function DrawConfigCard({
           }}
         />
         <Tooltip title="Aumentar">
-          <IconButton
-            size="small"
-            onClick={() => updateValue(maxPlayersPerTeam + 1)}
-            aria-label="Aumentar jogadores por time"
-          >
-            <AddOutlinedIcon />
-          </IconButton>
+          <span>
+            <IconButton
+              size="small"
+              onClick={() => updateValue(maxPlayersPerTeam + 1)}
+              disabled={!canEdit}
+              aria-label="Aumentar jogadores por time"
+            >
+              <AddOutlinedIcon />
+            </IconButton>
+          </span>
         </Tooltip>
       </Stack>
     </Box>

@@ -29,6 +29,7 @@ import type { DrawParticipant, DrawTeam } from '../types'
 
 type DrawResultCardProps = {
   teams: DrawTeam[]
+  canEdit?: boolean
   onRedraw: () => void
   onCopy: () => void
   onShare: () => void
@@ -291,6 +292,7 @@ function PlayerStatsDialog({
 
 export function DrawResultCard({
   teams,
+  canEdit = true,
   onRedraw,
   onCopy,
   onShare,
@@ -331,27 +333,31 @@ export function DrawResultCard({
               Times em campo
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.72)' }}>
-              Toque no jogador para lançar gols e assistências
+              {canEdit
+                ? 'Toque no jogador para lançar gols e assistências'
+                : 'Gols e assistências da semana'}
             </Typography>
           </Stack>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshOutlinedIcon />}
-              onClick={onRedraw}
-              sx={{
-                color: '#ffffff',
-                borderColor: 'rgba(255,255,255,0.55)',
-                bgcolor: 'rgba(255,255,255,0.06)',
-                '&:hover': {
-                  borderColor: '#ffffff',
-                  bgcolor: 'rgba(255,255,255,0.13)',
-                },
-              }}
-            >
-              Refazer sorteio
-            </Button>
+            {canEdit ? (
+              <Button
+                variant="outlined"
+                startIcon={<RefreshOutlinedIcon />}
+                onClick={onRedraw}
+                sx={{
+                  color: '#ffffff',
+                  borderColor: 'rgba(255,255,255,0.55)',
+                  bgcolor: 'rgba(255,255,255,0.06)',
+                  '&:hover': {
+                    borderColor: '#ffffff',
+                    bgcolor: 'rgba(255,255,255,0.13)',
+                  },
+                }}
+              >
+                Refazer sorteio
+              </Button>
+            ) : null}
             <Button
               variant="outlined"
               startIcon={<ContentCopyOutlinedIcon />}
@@ -465,7 +471,7 @@ export function DrawResultCard({
                         direction="row"
                         spacing={1.25}
                         onClick={() => {
-                          if (isMobile) {
+                          if (isMobile && canEdit) {
                             setSelectedPlayerId(player.id)
                           }
                         }}
@@ -477,7 +483,10 @@ export function DrawResultCard({
                           borderRadius: 2,
                           bgcolor: '#fff',
                           p: { xs: 1, sm: 0.75 },
-                          cursor: { xs: 'pointer', sm: 'default' },
+                          cursor: {
+                            xs: canEdit ? 'pointer' : 'default',
+                            sm: 'default',
+                          },
                         }}
                       >
                         <Stack
@@ -524,20 +533,24 @@ export function DrawResultCard({
                             </Stack>
                           </Box>
                         </Stack>
-                        <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-                          <PlayerStatControls
-                            player={player}
-                            compact
-                            onChangePlayerStat={onChangePlayerStat}
-                          />
-                        </Box>
-                        <IconButton
-                          size="small"
-                          aria-label={`Editar gols e assistências de ${player.name}`}
-                          sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
-                        >
-                          <EditOutlinedIcon fontSize="small" />
-                        </IconButton>
+                        {canEdit ? (
+                          <>
+                            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                              <PlayerStatControls
+                                player={player}
+                                compact
+                                onChangePlayerStat={onChangePlayerStat}
+                              />
+                            </Box>
+                            <IconButton
+                              size="small"
+                              aria-label={`Editar gols e assistências de ${player.name}`}
+                              sx={{ display: { xs: 'inline-flex', sm: 'none' } }}
+                            >
+                              <EditOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        ) : null}
                       </Stack>
                     ))}
                   </Stack>
