@@ -27,6 +27,7 @@ export type MatchDayListFilters = {
 
 export type MatchDayPlayer = {
   id: string
+  teamPlayerId: string
   playerId: string | null
   name: string
   nickname: string | null
@@ -43,10 +44,39 @@ export type MatchDayTeam = {
   players: MatchDayPlayer[]
 }
 
+export type ConfrontoScoreSource = 'MANUAL' | 'GOALS'
+
 export type ConfrontoPlayerStat = {
   playerId: string
   goals: number
+  ownGoals: number
   assists: number
+}
+
+export type ConfrontoSubstitutePlayer = {
+  playerId: string | null
+  name: string
+  nickname: string | null
+  jerseyNumber: number | null
+  photoUrl: string | null
+  position: PlayerPosition
+  type: PlayerType | null
+}
+
+export type ConfrontoSubstitution = {
+  id: string
+  teamId: string
+  outTeamPlayerId: string
+  inPlayer: ConfrontoSubstitutePlayer
+}
+
+export type ConfrontoSubstitutionInput =
+  | { playerId: string }
+  | { name: string; type: 'GUEST' }
+
+export type CreateConfrontoSubstitutionPayload = {
+  outTeamPlayerId: string
+  in: ConfrontoSubstitutionInput
 }
 
 export type MatchDayConfronto = {
@@ -56,7 +86,9 @@ export type MatchDayConfronto = {
   teamBId: string
   scoreA: number
   scoreB: number
+  scoreSource: ConfrontoScoreSource
   playerStats: ConfrontoPlayerStat[]
+  substitutions: ConfrontoSubstitution[]
 }
 
 export type MatchDayDetail = {
@@ -92,15 +124,19 @@ export type SaveDrawAsMatchDayPayload = {
 export type CreateConfrontoPayload = {
   teamAId: string
   teamBId: string
-  scoreA: number
-  scoreB: number
 }
 
-export type UpdateConfrontoPayload = Partial<CreateConfrontoPayload>
+export type UpdateConfrontoPayload = {
+  teamAId?: string
+  teamBId?: string
+  scoreA?: number
+  scoreB?: number
+}
 
 export type PlayerStatInput = {
   playerId: string
   goals?: number
+  ownGoals?: number
   assists?: number
 }
 
@@ -190,6 +226,36 @@ export async function setConfrontoPlayerStats(
 
 export async function deleteMatchDay(matchDayId: string) {
   await apiClient.delete(`/match-days/${matchDayId}`)
+}
+
+export async function renameMatchDayTeam(teamId: string, name: string) {
+  const response = await apiClient.patch<MatchDayTeam>(
+    `/match-day-teams/${teamId}`,
+    { name },
+  )
+
+  return response.data
+}
+
+export async function createConfrontoSubstitution(
+  confrontoId: string,
+  payload: CreateConfrontoSubstitutionPayload,
+) {
+  const response = await apiClient.post<ConfrontoSubstitution>(
+    `/match-day-confrontos/${confrontoId}/substitutions`,
+    payload,
+  )
+
+  return response.data
+}
+
+export async function deleteConfrontoSubstitution(
+  confrontoId: string,
+  substitutionId: string,
+) {
+  await apiClient.delete(
+    `/match-day-confrontos/${confrontoId}/substitutions/${substitutionId}`,
+  )
 }
 
 export async function setMatchDayCapa(matchDayId: string, teamId: string) {

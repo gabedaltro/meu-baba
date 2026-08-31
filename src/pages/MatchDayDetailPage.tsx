@@ -1,13 +1,19 @@
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
+import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import HourglassEmptyOutlinedIcon from "@mui/icons-material/HourglassEmptyOutlined";
 import MilitaryTechOutlinedIcon from "@mui/icons-material/MilitaryTechOutlined";
+import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
+import RemoveOutlinedIcon from "@mui/icons-material/RemoveOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
 import SportsSoccerOutlinedIcon from "@mui/icons-material/SportsSoccerOutlined";
+import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
+import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
 import {
   Alert,
   Avatar,
@@ -19,6 +25,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   IconButton,
   MenuItem,
   Paper,
@@ -36,17 +43,27 @@ import { useAuth } from "../features/auth/authContext";
 import { formatMatchDayDate } from "../features/matchDays/format";
 import {
   createConfronto,
+  createConfrontoSubstitution,
   deleteConfronto,
+  deleteConfrontoSubstitution,
   deleteMatchDay,
   fetchMatchDay,
+  renameMatchDayTeam,
   setConfrontoPlayerStats,
   setMatchDayCapa,
   updateConfronto,
+  type ConfrontoScoreSource,
+  type ConfrontoSubstitution,
   type MatchDayConfronto,
   type MatchDayDetail,
   type MatchDayPlayer,
   type MatchDayTeam,
 } from "../features/matchDays/matchDaysApi";
+import {
+  fetchTeamDrawPlayers,
+  mapApiPlayerToDrawParticipant,
+} from "../features/teamDraw/services/usersApi";
+import type { DrawParticipant } from "../features/teamDraw/types";
 
 type ConfrontoFormState = {
   teamAId: string;
@@ -62,7 +79,7 @@ const emptyConfrontoForm: ConfrontoFormState = {
   scoreB: "0",
 };
 
-type StatsFormEntry = { goals: string; assists: string };
+type StatsFormEntry = { goals: number; ownGoals: number; assists: number };
 
 type SnackbarState = {
   open: boolean;
@@ -74,25 +91,175 @@ function getPlayerLabel(player: MatchDayPlayer) {
   return player.nickname ? `${player.name} (${player.nickname})` : player.name;
 }
 
-function getConfrontoEligiblePlayers(
-  confronto: Pick<MatchDayConfronto, "teamAId" | "teamBId">,
+function getPlayerShortLabel(player: MatchDayPlayer) {
+  return player.nickname || player.name;
+}
+
+function StatStepper({
+  label,
+  value,
+  onIncrement,
+  onDecrement,
+  disabled,
+}: {
+  label: string;
+  value: number;
+  onIncrement: () => void;
+  onDecrement: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Stack
+      direction="row"
+      spacing={0.25}
+      sx={{
+        alignItems: "center",
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 2,
+        pl: 1,
+        bgcolor: "#fff",
+      }}
+    >
+      <Typography
+        variant="caption"
+        sx={{ fontWeight: 800, color: "text.secondary", minWidth: 40 }}
+      >
+        {label}
+      </Typography>
+      <IconButton
+        size="small"
+        onClick={onDecrement}
+        disabled={disabled || value <= 0}
+        aria-label={`Diminuir ${label}`}
+      >
+        <RemoveOutlinedIcon fontSize="small" />
+      </IconButton>
+      <Typography sx={{ width: 18, textAlign: "center", fontWeight: 900 }}>
+        {value}
+      </Typography>
+      <IconButton
+        size="small"
+        onClick={onIncrement}
+        disabled={disabled}
+        aria-label={`Aumentar ${label}`}
+      >
+        <AddOutlinedIcon fontSize="small" />
+      </IconButton>
+    </Stack>
+  );
+}
+
+function putGoalkeepersFirst(players: MatchDayPlayer[]) {
+  return [...players].sort((a, b) => {
+    const aIsGoalkeeper = a.position === "GOALKEEPER" ? 0 : 1;
+    const bIsGoalkeeper = b.position === "GOALKEEPER" ? 0 : 1;
+
+    return aIsGoalkeeper - bIsGoalkeeper;
+  });
+}
+
+type ConfrontoRosterPlayer = MatchDayPlayer & { isSubstitute: boolean };
+
+function applySubstitutions(
+  team: MatchDayTeam | undefined,
+  substitutions: ConfrontoSubstitution[],
+): ConfrontoRosterPlayer[] {
+  const substitutionsByOutId = new Map(
+    substitutions.map((substitution) => [
+      substitution.outTeamPlayerId,
+      substitution,
+    ]),
+  );
+
+  return (team?.players ?? []).map((player) => {
+    const substitution = substitutionsByOutId.get(player.teamPlayerId);
+
+    if (!substitution) {
+      return { ...player, isSubstitute: false };
+    }
+
+    return {
+      id: substitution.id,
+      teamPlayerId: substitution.id,
+      playerId: substitution.inPlayer.playerId,
+      name: substitution.inPlayer.name,
+      nickname: substitution.inPlayer.nickname,
+      jerseyNumber: substitution.inPlayer.jerseyNumber,
+      photoUrl: substitution.inPlayer.photoUrl,
+      position: substitution.inPlayer.position,
+      type: substitution.inPlayer.type,
+      isSubstitute: true,
+    };
+  });
+}
+
+function getEligibleTeamPlayers(
+  team: MatchDayTeam | undefined,
+  substitutions: ConfrontoSubstitution[],
+) {
+  const eligible = applySubstitutions(team, substitutions).filter(
+    (player): player is ConfrontoRosterPlayer & { playerId: string } =>
+      player.playerId !== null,
+  );
+
+  return putGoalkeepersFirst(eligible) as (ConfrontoRosterPlayer & {
+    playerId: string;
+  })[];
+}
+
+function getConfrontoEligibleTeams(
+  confronto: Pick<MatchDayConfronto, "teamAId" | "teamBId" | "substitutions">,
   teamsById: Map<string, MatchDayTeam>,
 ) {
   const teamA = teamsById.get(confronto.teamAId);
   const teamB = teamsById.get(confronto.teamBId);
 
-  return [...(teamA?.players ?? []), ...(teamB?.players ?? [])].filter(
-    (player): player is MatchDayPlayer & { playerId: string } =>
-      player.playerId !== null,
+  return [
+    {
+      teamId: confronto.teamAId,
+      teamName: teamA?.name ?? "Time A",
+      players: getEligibleTeamPlayers(teamA, confronto.substitutions),
+    },
+    {
+      teamId: confronto.teamBId,
+      teamName: teamB?.name ?? "Time B",
+      players: getEligibleTeamPlayers(teamB, confronto.substitutions),
+    },
+  ];
+}
+
+function getConfrontoEligiblePlayers(
+  confronto: Pick<MatchDayConfronto, "teamAId" | "teamBId" | "substitutions">,
+  teamsById: Map<string, MatchDayTeam>,
+) {
+  return getConfrontoEligibleTeams(confronto, teamsById).flatMap(
+    (group) => group.players,
   );
 }
 
 function TeamRosterCard({
   team,
   isCapa,
+  canEdit,
+  isEditing,
+  editValue,
+  isSavingName,
+  onStartEdit,
+  onCancelEdit,
+  onChangeEditValue,
+  onSubmitEdit,
 }: {
   team: MatchDayTeam;
   isCapa: boolean;
+  canEdit: boolean;
+  isEditing: boolean;
+  editValue: string;
+  isSavingName: boolean;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onChangeEditValue: (value: string) => void;
+  onSubmitEdit: () => void;
 }) {
   return (
     <Paper
@@ -106,20 +273,80 @@ function TeamRosterCard({
     >
       <Stack spacing={1.25}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <Typography variant="h3" sx={{ flex: 1 }} noWrap>
-            {team.name}
-          </Typography>
-          {isCapa ? (
-            <Chip
-              size="small"
-              icon={<MilitaryTechOutlinedIcon />}
-              label="Capa"
-              color="warning"
-            />
-          ) : null}
+          {isEditing ? (
+            <>
+              <TextField
+                value={editValue}
+                onChange={(event) => onChangeEditValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    onSubmitEdit();
+                  }
+
+                  if (event.key === "Escape") {
+                    onCancelEdit();
+                  }
+                }}
+                size="small"
+                autoFocus
+                fullWidth
+                disabled={isSavingName}
+                slotProps={{ htmlInput: { maxLength: 50 } }}
+              />
+              <Tooltip title="Salvar nome">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    onClick={onSubmitEdit}
+                    disabled={isSavingName || !editValue.trim()}
+                  >
+                    {isSavingName ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <CheckOutlinedIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Cancelar">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={onCancelEdit}
+                    disabled={isSavingName}
+                  >
+                    <CloseOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </>
+          ) : (
+            <>
+              <Typography variant="h3" sx={{ flex: 1 }} noWrap>
+                {team.name}
+              </Typography>
+              {canEdit ? (
+                <Tooltip title="Renomear time">
+                  <IconButton size="small" onClick={onStartEdit}>
+                    <EditOutlinedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              ) : null}
+              {isCapa ? (
+                <Chip
+                  size="small"
+                  icon={<MilitaryTechOutlinedIcon />}
+                  label="Capa"
+                  color="warning"
+                />
+              ) : null}
+            </>
+          )}
         </Stack>
         <Stack spacing={0.75}>
-          {team.players.map((player) => (
+          {putGoalkeepersFirst(team.players).map((player) => (
             <Stack
               key={player.id}
               direction="row"
@@ -167,6 +394,7 @@ function ConfrontoRow({
   onEdit,
   onDelete,
   onManageStats,
+  onManageSubstitutions,
 }: {
   confronto: MatchDayConfronto;
   teamAName: string;
@@ -176,6 +404,7 @@ function ConfrontoRow({
   onEdit: () => void;
   onDelete: () => void;
   onManageStats: () => void;
+  onManageSubstitutions: () => void;
 }) {
   const winner =
     confronto.scoreA === confronto.scoreB
@@ -224,13 +453,6 @@ function ConfrontoRow({
             {teamBName}
           </Typography>
         </Stack>
-        {confronto.playerStats.length > 0 ? (
-          <Typography variant="caption" color="text.secondary">
-            {confronto.playerStats.length} jogador
-            {confronto.playerStats.length === 1 ? "" : "es"} com estatística
-            lançada
-          </Typography>
-        ) : null}
       </Stack>
       <Tooltip title="Gols e assistências">
         <IconButton size="small" color="primary" onClick={onManageStats}>
@@ -239,6 +461,11 @@ function ConfrontoRow({
       </Tooltip>
       {canManage ? (
         <>
+          <Tooltip title="Substituições">
+            <IconButton size="small" onClick={onManageSubstitutions}>
+              <SwapHorizOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Editar confronto">
             <span>
               <IconButton size="small" onClick={onEdit} disabled={isDeleting}>
@@ -288,6 +515,8 @@ export function MatchDayDetailPage() {
   const [editingConfrontoId, setEditingConfrontoId] = useState<string | null>(
     null,
   );
+  const [editingConfrontoScoreSource, setEditingConfrontoScoreSource] =
+    useState<ConfrontoScoreSource | null>(null);
   const [confrontoForm, setConfrontoForm] =
     useState<ConfrontoFormState>(emptyConfrontoForm);
   const [isSavingConfronto, setIsSavingConfronto] = useState(false);
@@ -304,8 +533,33 @@ export function MatchDayDetailPage() {
   const [isSavingStats, setIsSavingStats] = useState(false);
   const [statsErrorMessage, setStatsErrorMessage] = useState("");
 
+  const [substitutionConfronto, setSubstitutionConfronto] =
+    useState<MatchDayConfronto | null>(null);
+  const [substitutingOutTeamPlayerId, setSubstitutingOutTeamPlayerId] =
+    useState<string | null>(null);
+  const [substituteSelectedPlayerId, setSubstituteSelectedPlayerId] =
+    useState("");
+  const [substituteGuestName, setSubstituteGuestName] = useState("");
+  const [isSavingSubstitution, setIsSavingSubstitution] = useState(false);
+  const [substitutionErrorMessage, setSubstitutionErrorMessage] =
+    useState("");
+  const [removingSubstitutionId, setRemovingSubstitutionId] = useState<
+    string | null
+  >(null);
+  const [registeredPlayers, setRegisteredPlayers] = useState<
+    DrawParticipant[]
+  >([]);
+  const [isLoadingRegisteredPlayers, setIsLoadingRegisteredPlayers] =
+    useState(false);
+  const [hasLoadedRegisteredPlayers, setHasLoadedRegisteredPlayers] =
+    useState(false);
+
   const [isSavingCapa, setIsSavingCapa] = useState(false);
   const [capaSelection, setCapaSelection] = useState("");
+
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [teamNameDraft, setTeamNameDraft] = useState("");
+  const [isSavingTeamName, setIsSavingTeamName] = useState(false);
 
   const showSnackbar = (
     message: string,
@@ -349,10 +603,12 @@ export function MatchDayDetailPage() {
 
   const refreshMatchDay = async () => {
     if (!matchDayId) {
-      return;
+      return undefined;
     }
 
-    setMatchDay(await fetchMatchDay(matchDayId));
+    const detail = await fetchMatchDay(matchDayId);
+    setMatchDay(detail);
+    return detail;
   };
 
   const teamsById = useMemo(
@@ -368,12 +624,35 @@ export function MatchDayDetailPage() {
     [matchDay],
   );
 
+  const rosterPlayerIds = useMemo(() => {
+    const ids = new Set<string>();
+
+    (matchDay?.teams ?? []).forEach((team) => {
+      team.players.forEach((player) => {
+        if (player.playerId) {
+          ids.add(player.playerId);
+        }
+      });
+    });
+
+    return ids;
+  }, [matchDay]);
+
+  const availableSubstitutePlayers = useMemo(
+    () =>
+      registeredPlayers.filter(
+        (player) => !rosterPlayerIds.has(String(player.id)),
+      ),
+    [registeredPlayers, rosterPlayerIds],
+  );
+
   const capaTeam = matchDay?.capaTeamId
     ? teamsById.get(matchDay.capaTeamId)
     : undefined;
 
   const openCreateConfrontoDialog = () => {
     setEditingConfrontoId(null);
+    setEditingConfrontoScoreSource(null);
     setConfrontoForm(emptyConfrontoForm);
     setConfrontoErrorMessage("");
     setIsConfrontoDialogOpen(true);
@@ -381,6 +660,7 @@ export function MatchDayDetailPage() {
 
   const openEditConfrontoDialog = (confronto: MatchDayConfronto) => {
     setEditingConfrontoId(confronto.id);
+    setEditingConfrontoScoreSource(confronto.scoreSource);
     setConfrontoForm({
       teamAId: confronto.teamAId,
       teamBId: confronto.teamBId,
@@ -400,6 +680,9 @@ export function MatchDayDetailPage() {
     setConfrontoErrorMessage("");
   };
 
+  const isEditingManualScore =
+    editingConfrontoId !== null && editingConfrontoScoreSource === "MANUAL";
+
   const submitConfronto = async () => {
     if (!matchDayId) {
       return;
@@ -415,19 +698,24 @@ export function MatchDayDetailPage() {
       return;
     }
 
-    const scoreA = Number(confrontoForm.scoreA || 0);
-    const scoreB = Number(confrontoForm.scoreB || 0);
+    let scoreA = 0;
+    let scoreB = 0;
 
-    if (
-      !Number.isInteger(scoreA) ||
-      !Number.isInteger(scoreB) ||
-      scoreA < 0 ||
-      scoreB < 0
-    ) {
-      setConfrontoErrorMessage(
-        "O placar deve ser um número inteiro maior ou igual a zero.",
-      );
-      return;
+    if (isEditingManualScore) {
+      scoreA = Number(confrontoForm.scoreA || 0);
+      scoreB = Number(confrontoForm.scoreB || 0);
+
+      if (
+        !Number.isInteger(scoreA) ||
+        !Number.isInteger(scoreB) ||
+        scoreA < 0 ||
+        scoreB < 0
+      ) {
+        setConfrontoErrorMessage(
+          "O placar deve ser um número inteiro maior ou igual a zero.",
+        );
+        return;
+      }
     }
 
     setIsSavingConfronto(true);
@@ -438,16 +726,13 @@ export function MatchDayDetailPage() {
         await updateConfronto(editingConfrontoId, {
           teamAId: confrontoForm.teamAId,
           teamBId: confrontoForm.teamBId,
-          scoreA,
-          scoreB,
+          ...(isEditingManualScore ? { scoreA, scoreB } : {}),
         });
         showSnackbar("Confronto atualizado.");
       } else {
         await createConfronto(matchDayId, {
           teamAId: confrontoForm.teamAId,
           teamBId: confrontoForm.teamBId,
-          scoreA,
-          scoreB,
         });
         showSnackbar("Confronto adicionado.");
       }
@@ -493,8 +778,9 @@ export function MatchDayDetailPage() {
       );
 
       initialForm[player.playerId] = {
-        goals: String(existing?.goals ?? 0),
-        assists: String(existing?.assists ?? 0),
+        goals: existing?.goals ?? 0,
+        ownGoals: existing?.ownGoals ?? 0,
+        assists: existing?.assists ?? 0,
       };
     });
 
@@ -513,15 +799,19 @@ export function MatchDayDetailPage() {
     setStatsErrorMessage("");
   };
 
-  const updateStatsField = (
+  const emptyStatsEntry: StatsFormEntry = { goals: 0, ownGoals: 0, assists: 0 };
+
+  const changeStatsField = (
     playerId: string,
     field: keyof StatsFormEntry,
-    value: string,
+    delta: number,
   ) => {
-    setStatsForm((current) => ({
-      ...current,
-      [playerId]: { ...current[playerId], [field]: value },
-    }));
+    setStatsForm((current) => {
+      const entry = current[playerId] ?? emptyStatsEntry;
+      const nextValue = Math.max(0, entry[field] + delta);
+
+      return { ...current, [playerId]: { ...entry, [field]: nextValue } };
+    });
   };
 
   const submitStats = async () => {
@@ -534,29 +824,15 @@ export function MatchDayDetailPage() {
       teamsById,
     );
     const entries = eligiblePlayers.map((player) => {
-      const values = statsForm[player.playerId] ?? { goals: "0", assists: "0" };
+      const values = statsForm[player.playerId] ?? emptyStatsEntry;
 
       return {
         playerId: player.playerId,
-        goals: Number(values.goals || 0),
-        assists: Number(values.assists || 0),
+        goals: values.goals,
+        ownGoals: values.ownGoals,
+        assists: values.assists,
       };
     });
-
-    const hasInvalidValue = entries.some(
-      (entry) =>
-        !Number.isInteger(entry.goals) ||
-        !Number.isInteger(entry.assists) ||
-        entry.goals < 0 ||
-        entry.assists < 0,
-    );
-
-    if (hasInvalidValue) {
-      setStatsErrorMessage(
-        "Gols e assistências devem ser inteiros maiores ou iguais a zero.",
-      );
-      return;
-    }
 
     setIsSavingStats(true);
     setStatsErrorMessage("");
@@ -571,6 +847,183 @@ export function MatchDayDetailPage() {
       setStatsErrorMessage("Não foi possível salvar as estatísticas.");
     } finally {
       setIsSavingStats(false);
+    }
+  };
+
+  const ensureRegisteredPlayersLoaded = () => {
+    if (hasLoadedRegisteredPlayers || isLoadingRegisteredPlayers) {
+      return;
+    }
+
+    setIsLoadingRegisteredPlayers(true);
+
+    fetchTeamDrawPlayers()
+      .then((players) => {
+        setRegisteredPlayers(players.map(mapApiPlayerToDrawParticipant));
+        setHasLoadedRegisteredPlayers(true);
+      })
+      .catch(() => {
+        showSnackbar("Não foi possível carregar os jogadores cadastrados.", "error");
+      })
+      .finally(() => {
+        setIsLoadingRegisteredPlayers(false);
+      });
+  };
+
+  const openSubstitutionDialog = (confronto: MatchDayConfronto) => {
+    setSubstitutionConfronto(confronto);
+    setSubstitutingOutTeamPlayerId(null);
+    setSubstituteSelectedPlayerId("");
+    setSubstituteGuestName("");
+    setSubstitutionErrorMessage("");
+    ensureRegisteredPlayersLoaded();
+  };
+
+  const closeSubstitutionDialog = () => {
+    if (isSavingSubstitution || removingSubstitutionId) {
+      return;
+    }
+
+    setSubstitutionConfronto(null);
+    setSubstitutingOutTeamPlayerId(null);
+    setSubstituteSelectedPlayerId("");
+    setSubstituteGuestName("");
+    setSubstitutionErrorMessage("");
+  };
+
+  const startSubstitution = (teamPlayerId: string) => {
+    setSubstitutingOutTeamPlayerId(teamPlayerId);
+    setSubstituteSelectedPlayerId("");
+    setSubstituteGuestName("");
+    setSubstitutionErrorMessage("");
+  };
+
+  const cancelSubstitution = () => {
+    setSubstitutingOutTeamPlayerId(null);
+    setSubstituteSelectedPlayerId("");
+    setSubstituteGuestName("");
+    setSubstitutionErrorMessage("");
+  };
+
+  const submitSubstitution = async () => {
+    if (!substitutionConfronto || !substitutingOutTeamPlayerId) {
+      return;
+    }
+
+    const trimmedGuestName = substituteGuestName.trim();
+
+    if (!substituteSelectedPlayerId && !trimmedGuestName) {
+      setSubstitutionErrorMessage(
+        "Selecione um jogador cadastrado ou digite um nome.",
+      );
+      return;
+    }
+
+    setIsSavingSubstitution(true);
+    setSubstitutionErrorMessage("");
+
+    try {
+      await createConfrontoSubstitution(substitutionConfronto.id, {
+        outTeamPlayerId: substitutingOutTeamPlayerId,
+        in: substituteSelectedPlayerId
+          ? { playerId: substituteSelectedPlayerId }
+          : { name: trimmedGuestName, type: "GUEST" },
+      });
+      showSnackbar("Substituição registrada.");
+      setSubstitutingOutTeamPlayerId(null);
+      setSubstituteSelectedPlayerId("");
+      setSubstituteGuestName("");
+
+      const refreshed = await refreshMatchDay();
+      const updatedConfronto = refreshed?.confrontos.find(
+        (confronto) => confronto.id === substitutionConfronto.id,
+      );
+
+      if (updatedConfronto) {
+        setSubstitutionConfronto(updatedConfronto);
+      }
+    } catch {
+      setSubstitutionErrorMessage("Não foi possível registrar a substituição.");
+    } finally {
+      setIsSavingSubstitution(false);
+    }
+  };
+
+  const removeSubstitution = async (substitution: ConfrontoSubstitution) => {
+    if (!substitutionConfronto) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Desfazer esta substituição? O gol/assistência do substituto nesse confronto será removido.",
+      )
+    ) {
+      return;
+    }
+
+    setRemovingSubstitutionId(substitution.id);
+
+    try {
+      await deleteConfrontoSubstitution(
+        substitutionConfronto.id,
+        substitution.id,
+      );
+      showSnackbar("Substituição desfeita.");
+
+      const refreshed = await refreshMatchDay();
+      const updatedConfronto = refreshed?.confrontos.find(
+        (confronto) => confronto.id === substitutionConfronto.id,
+      );
+
+      if (updatedConfronto) {
+        setSubstitutionConfronto(updatedConfronto);
+      }
+    } catch {
+      showSnackbar("Não foi possível desfazer a substituição.", "error");
+    } finally {
+      setRemovingSubstitutionId(null);
+    }
+  };
+
+  const startEditingTeamName = (team: MatchDayTeam) => {
+    setEditingTeamId(team.id);
+    setTeamNameDraft(team.name);
+  };
+
+  const cancelEditingTeamName = () => {
+    if (isSavingTeamName) {
+      return;
+    }
+
+    setEditingTeamId(null);
+    setTeamNameDraft("");
+  };
+
+  const submitTeamName = async () => {
+    if (!editingTeamId) {
+      return;
+    }
+
+    const trimmedName = teamNameDraft.trim();
+
+    if (!trimmedName) {
+      showSnackbar("Informe um nome para o time.", "error");
+      return;
+    }
+
+    setIsSavingTeamName(true);
+
+    try {
+      await renameMatchDayTeam(editingTeamId, trimmedName);
+      showSnackbar("Nome do time atualizado.");
+      setEditingTeamId(null);
+      setTeamNameDraft("");
+      await refreshMatchDay();
+    } catch {
+      showSnackbar("Não foi possível renomear o time.", "error");
+    } finally {
+      setIsSavingTeamName(false);
     }
   };
 
@@ -644,9 +1097,12 @@ export function MatchDayDetailPage() {
     );
   }
 
-  const eligibleStatsPlayers = statsConfronto
-    ? getConfrontoEligiblePlayers(statsConfronto, teamsById)
+  const eligibleStatsTeams = statsConfronto
+    ? getConfrontoEligibleTeams(statsConfronto, teamsById)
     : [];
+  const eligibleStatsPlayers = eligibleStatsTeams.flatMap(
+    (group) => group.players,
+  );
 
   return (
     <Stack spacing={{ xs: 2.5, md: 4 }} sx={{ pb: 4 }}>
@@ -814,6 +1270,14 @@ export function MatchDayDetailPage() {
               key={team.id}
               team={team}
               isCapa={team.id === matchDay.capaTeamId}
+              canEdit={isAuthenticated}
+              isEditing={editingTeamId === team.id}
+              editValue={teamNameDraft}
+              isSavingName={isSavingTeamName}
+              onStartEdit={() => startEditingTeamName(team)}
+              onCancelEdit={cancelEditingTeamName}
+              onChangeEditValue={setTeamNameDraft}
+              onSubmitEdit={() => void submitTeamName()}
             />
           ))}
       </Box>
@@ -856,6 +1320,7 @@ export function MatchDayDetailPage() {
                   onEdit={() => openEditConfrontoDialog(confronto)}
                   onDelete={() => void removeConfronto(confronto)}
                   onManageStats={() => openStatsDialog(confronto)}
+                  onManageSubstitutions={() => openSubstitutionDialog(confronto)}
                 />
               ))}
             </Stack>
@@ -917,34 +1382,41 @@ export function MatchDayDetailPage() {
                 </MenuItem>
               ))}
             </Select>
-            <Stack direction="row" spacing={1.5}>
-              <TextField
-                label="Placar A"
-                type="number"
-                value={confrontoForm.scoreA}
-                onChange={(event) =>
-                  setConfrontoForm((current) => ({
-                    ...current,
-                    scoreA: event.target.value,
-                  }))
-                }
-                slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                fullWidth
-              />
-              <TextField
-                label="Placar B"
-                type="number"
-                value={confrontoForm.scoreB}
-                onChange={(event) =>
-                  setConfrontoForm((current) => ({
-                    ...current,
-                    scoreB: event.target.value,
-                  }))
-                }
-                slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                fullWidth
-              />
-            </Stack>
+            {isEditingManualScore ? (
+              <Stack direction="row" spacing={1.5}>
+                <TextField
+                  label="Placar A"
+                  type="number"
+                  value={confrontoForm.scoreA}
+                  onChange={(event) =>
+                    setConfrontoForm((current) => ({
+                      ...current,
+                      scoreA: event.target.value,
+                    }))
+                  }
+                  slotProps={{ htmlInput: { min: 0, step: 1 } }}
+                  fullWidth
+                />
+                <TextField
+                  label="Placar B"
+                  type="number"
+                  value={confrontoForm.scoreB}
+                  onChange={(event) =>
+                    setConfrontoForm((current) => ({
+                      ...current,
+                      scoreB: event.target.value,
+                    }))
+                  }
+                  slotProps={{ htmlInput: { min: 0, step: 1 } }}
+                  fullWidth
+                />
+              </Stack>
+            ) : (
+              <Alert severity="info">
+                O placar é calculado automaticamente a partir dos gols
+                lançados em "Gols e assistências".
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
@@ -989,58 +1461,123 @@ export function MatchDayDetailPage() {
                   estatísticas. Convidados avulsos não podem ser creditados.
                 </Typography>
               ) : (
-                <Stack spacing={1} sx={{ maxHeight: 360, overflowY: "auto" }}>
-                  {eligibleStatsPlayers.map((player) => (
-                    <Stack
-                      key={player.playerId}
-                      direction="row"
-                      spacing={1}
-                      sx={{ alignItems: "center" }}
-                    >
-                      <Avatar
-                        src={player.photoUrl ?? undefined}
-                        alt={player.name}
-                        sx={{ width: 32, height: 32, fontSize: 12 }}
-                      >
-                        {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
-                      </Avatar>
+                <Stack spacing={2.5} sx={{ maxHeight: 420, overflowY: "auto", pr: 0.5 }}>
+                  {eligibleStatsTeams.map((group) => (
+                    <Stack key={group.teamId} spacing={1}>
                       <Typography
-                        variant="body2"
-                        sx={{ flex: 1, fontWeight: 700, minWidth: 0 }}
-                        noWrap
+                        variant="overline"
+                        sx={{
+                          fontWeight: 800,
+                          color: "primary.main",
+                          lineHeight: 1.2,
+                        }}
                       >
-                        {getPlayerLabel(player)}
+                        {group.teamName}
                       </Typography>
-                      <TextField
-                        label="Gols"
-                        type="number"
-                        size="small"
-                        value={statsForm[player.playerId]?.goals ?? "0"}
-                        onChange={(event) =>
-                          updateStatsField(
-                            player.playerId,
-                            "goals",
-                            event.target.value,
-                          )
-                        }
-                        slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                        sx={{ width: 90 }}
-                      />
-                      <TextField
-                        label="Assist."
-                        type="number"
-                        size="small"
-                        value={statsForm[player.playerId]?.assists ?? "0"}
-                        onChange={(event) =>
-                          updateStatsField(
-                            player.playerId,
-                            "assists",
-                            event.target.value,
-                          )
-                        }
-                        slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                        sx={{ width: 90 }}
-                      />
+                      {group.players.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          Nenhum jogador cadastrado neste time.
+                        </Typography>
+                      ) : (
+                        <Stack spacing={1}>
+                          {group.players.map((player) => {
+                            const entry =
+                              statsForm[player.playerId] ?? emptyStatsEntry;
+
+                            return (
+                              <Stack
+                                key={player.playerId}
+                                spacing={1}
+                                sx={{
+                                  border: "1px solid",
+                                  borderColor: "divider",
+                                  borderRadius: 2,
+                                  p: 1,
+                                  bgcolor: "#f7faf8",
+                                }}
+                              >
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  sx={{ alignItems: "center" }}
+                                >
+                                  <Avatar
+                                    src={player.photoUrl ?? undefined}
+                                    alt={player.name}
+                                    sx={{ width: 30, height: 30, fontSize: 12 }}
+                                  >
+                                    {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
+                                  </Avatar>
+                                  <Typography
+                                    sx={{ flex: 1, fontWeight: 800, minWidth: 0 }}
+                                    noWrap
+                                  >
+                                    {getPlayerShortLabel(player)}
+                                  </Typography>
+                                  {player.position === "GOALKEEPER" ? (
+                                    <Chip
+                                      label="Goleiro"
+                                      size="small"
+                                      color="primary"
+                                      variant="outlined"
+                                      sx={{ flexShrink: 0 }}
+                                    />
+                                  ) : null}
+                                  {player.isSubstitute ? (
+                                    <Chip
+                                      label="Substituto"
+                                      size="small"
+                                      color="secondary"
+                                      variant="outlined"
+                                      sx={{ flexShrink: 0 }}
+                                    />
+                                  ) : null}
+                                </Stack>
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  useFlexGap
+                                  sx={{ flexWrap: "wrap" }}
+                                >
+                                  <StatStepper
+                                    label="Gols"
+                                    value={entry.goals}
+                                    disabled={isSavingStats}
+                                    onIncrement={() =>
+                                      changeStatsField(player.playerId, "goals", 1)
+                                    }
+                                    onDecrement={() =>
+                                      changeStatsField(player.playerId, "goals", -1)
+                                    }
+                                  />
+                                  <StatStepper
+                                    label="Contra"
+                                    value={entry.ownGoals}
+                                    disabled={isSavingStats}
+                                    onIncrement={() =>
+                                      changeStatsField(player.playerId, "ownGoals", 1)
+                                    }
+                                    onDecrement={() =>
+                                      changeStatsField(player.playerId, "ownGoals", -1)
+                                    }
+                                  />
+                                  <StatStepper
+                                    label="Assist."
+                                    value={entry.assists}
+                                    disabled={isSavingStats}
+                                    onIncrement={() =>
+                                      changeStatsField(player.playerId, "assists", 1)
+                                    }
+                                    onDecrement={() =>
+                                      changeStatsField(player.playerId, "assists", -1)
+                                    }
+                                  />
+                                </Stack>
+                              </Stack>
+                            );
+                          })}
+                        </Stack>
+                      )}
                     </Stack>
                   ))}
                 </Stack>
@@ -1065,6 +1602,218 @@ export function MatchDayDetailPage() {
             }
           >
             Salvar estatísticas
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(substitutionConfronto)}
+        onClose={closeSubstitutionDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Substituições do confronto</DialogTitle>
+        <DialogContent>
+          {substitutionConfronto ? (
+            <Stack spacing={2.5} sx={{ pt: 1 }}>
+              <Alert severity="info">
+                Substitua um jogador ausente só nesse confronto. Ele continua
+                normal nos outros confrontos da rodada.
+              </Alert>
+              {substitutionErrorMessage ? (
+                <Alert severity="error">{substitutionErrorMessage}</Alert>
+              ) : null}
+              {[
+                {
+                  teamId: substitutionConfronto.teamAId,
+                  team: teamsById.get(substitutionConfronto.teamAId),
+                },
+                {
+                  teamId: substitutionConfronto.teamBId,
+                  team: teamsById.get(substitutionConfronto.teamBId),
+                },
+              ].map(({ teamId, team }) => (
+                <Stack key={teamId} spacing={1}>
+                  <Typography
+                    variant="overline"
+                    sx={{ fontWeight: 800, color: "primary.main", lineHeight: 1.2 }}
+                  >
+                    {team?.name ?? "Time"}
+                  </Typography>
+                  <Stack spacing={1}>
+                    {(team?.players ?? []).map((player) => {
+                      const substitution = substitutionConfronto.substitutions.find(
+                        (item) => item.outTeamPlayerId === player.teamPlayerId,
+                      );
+                      const isEditingThisPlayer =
+                        substitutingOutTeamPlayerId === player.teamPlayerId;
+
+                      return (
+                        <Stack
+                          key={player.teamPlayerId}
+                          spacing={1}
+                          sx={{
+                            border: "1px solid",
+                            borderColor: "divider",
+                            borderRadius: 2,
+                            p: 1,
+                          }}
+                        >
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            sx={{ alignItems: "center" }}
+                          >
+                            <Avatar
+                              src={player.photoUrl ?? undefined}
+                              alt={player.name}
+                              sx={{ width: 30, height: 30, fontSize: 12 }}
+                            >
+                              {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
+                            </Avatar>
+                            <Typography
+                              sx={{ flex: 1, fontWeight: 800, minWidth: 0 }}
+                              noWrap
+                            >
+                              {getPlayerShortLabel(player)}
+                            </Typography>
+                            {!substitution ? (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<SwapHorizOutlinedIcon />}
+                                onClick={() =>
+                                  isEditingThisPlayer
+                                    ? cancelSubstitution()
+                                    : startSubstitution(player.teamPlayerId)
+                                }
+                              >
+                                {isEditingThisPlayer ? "Cancelar" : "Substituir"}
+                              </Button>
+                            ) : null}
+                          </Stack>
+
+                          {substitution ? (
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              sx={{
+                                alignItems: "center",
+                                bgcolor: "#f7faf8",
+                                borderRadius: 1.5,
+                                p: 1,
+                              }}
+                            >
+                              <SwapHorizOutlinedIcon
+                                fontSize="small"
+                                color="action"
+                              />
+                              <Typography
+                                variant="body2"
+                                sx={{ flex: 1, fontWeight: 700, minWidth: 0 }}
+                                noWrap
+                              >
+                                {substitution.inPlayer.nickname
+                                  ? substitution.inPlayer.nickname
+                                  : substitution.inPlayer.name}
+                              </Typography>
+                              <Tooltip title="Desfazer substituição">
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => void removeSubstitution(substitution)}
+                                    disabled={removingSubstitutionId === substitution.id}
+                                  >
+                                    {removingSubstitutionId === substitution.id ? (
+                                      <CircularProgress size={16} color="inherit" />
+                                    ) : (
+                                      <UndoOutlinedIcon fontSize="small" />
+                                    )}
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </Stack>
+                          ) : null}
+
+                          {isEditingThisPlayer ? (
+                            <Stack spacing={1} sx={{ pt: 0.5 }}>
+                              <Select
+                                displayEmpty
+                                size="small"
+                                value={substituteSelectedPlayerId}
+                                disabled={
+                                  isLoadingRegisteredPlayers ||
+                                  availableSubstitutePlayers.length === 0
+                                }
+                                onChange={(event) => {
+                                  setSubstituteSelectedPlayerId(event.target.value);
+                                  setSubstituteGuestName("");
+                                }}
+                                fullWidth
+                              >
+                                <MenuItem value="">
+                                  {isLoadingRegisteredPlayers
+                                    ? "Carregando jogadores..."
+                                    : availableSubstitutePlayers.length === 0
+                                      ? "Nenhum jogador disponível"
+                                      : "Selecionar jogador cadastrado"}
+                                </MenuItem>
+                                {availableSubstitutePlayers.map((candidate) => (
+                                  <MenuItem key={candidate.id} value={String(candidate.id)}>
+                                    {candidate.nickname
+                                      ? `${candidate.name} (${candidate.nickname})`
+                                      : candidate.name}
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                              <Divider>ou</Divider>
+                              <TextField
+                                label="Nome digitado"
+                                size="small"
+                                value={substituteGuestName}
+                                onChange={(event) => {
+                                  setSubstituteGuestName(event.target.value);
+                                  setSubstituteSelectedPlayerId("");
+                                }}
+                                fullWidth
+                              />
+                              <Button
+                                variant="contained"
+                                size="small"
+                                startIcon={
+                                  isSavingSubstitution ? (
+                                    <CircularProgress color="inherit" size={16} />
+                                  ) : (
+                                    <PersonAddAltOutlinedIcon />
+                                  )
+                                }
+                                onClick={() => void submitSubstitution()}
+                                disabled={
+                                  isSavingSubstitution ||
+                                  (!substituteSelectedPlayerId &&
+                                    !substituteGuestName.trim())
+                                }
+                              >
+                                Confirmar substituição
+                              </Button>
+                            </Stack>
+                          ) : null}
+                        </Stack>
+                      );
+                    })}
+                  </Stack>
+                </Stack>
+              ))}
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={closeSubstitutionDialog}
+            disabled={isSavingSubstitution || Boolean(removingSubstitutionId)}
+          >
+            Fechar
           </Button>
         </DialogActions>
       </Dialog>
