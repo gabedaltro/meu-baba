@@ -583,10 +583,8 @@ export function PlayersPage() {
                 return (
                   <Stack
                     key={player.id}
-                    direction="row"
                     spacing={1}
                     sx={{
-                      alignItems: "center",
                       border: "1px solid",
                       borderColor: player.isActive
                         ? "divider"
@@ -598,108 +596,123 @@ export function PlayersPage() {
                       p: 1,
                     }}
                   >
-                    <Avatar
-                      src={player.photoUrl ?? undefined}
-                      alt={player.name}
-                      sx={{ width: 40, height: 40 }}
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ alignItems: "center", minWidth: 0 }}
                     >
-                      {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
-                    </Avatar>
-                    <Stack sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 800 }}
-                        noWrap
+                      <Avatar
+                        src={player.photoUrl ?? undefined}
+                        alt={player.name}
+                        sx={{ width: 40, height: 40, flexShrink: 0 }}
                       >
-                        {player.name}
-                      </Typography>
-                      {getPlayerSubtitle(player) ? (
+                        {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
+                      </Avatar>
+                      <Stack sx={{ flex: 1, minWidth: 0 }}>
                         <Typography
-                          variant="caption"
-                          color="text.secondary"
+                          variant="body2"
+                          sx={{ fontWeight: 800 }}
                           noWrap
                         >
-                          {getPlayerSubtitle(player)}
+                          {player.name}
                         </Typography>
-                      ) : null}
-                      <Stack
-                        direction="row"
-                        spacing={0.75}
-                        useFlexGap
-                        sx={{ flexWrap: "wrap", mt: 0.5 }}
-                      >
-                        <Chip
-                          label={getPlayerTypeLabel(player)}
-                          size="small"
-                          color={getPlayerTypeColor(player)}
-                        />
-                        <Chip
-                          label={`${player.goals} gol${player.goals === 1 ? "" : "s"}`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={`${player.assists} assist${
-                            player.assists === 1 ? "" : "s"
-                          }`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={player.isActive ? "Ativo" : "Inativo"}
-                          size="small"
-                          color={player.isActive ? "success" : "error"}
-                          variant="outlined"
-                        />
+                        {getPlayerSubtitle(player) ? (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            noWrap
+                          >
+                            {getPlayerSubtitle(player)}
+                          </Typography>
+                        ) : null}
                       </Stack>
                     </Stack>
-                    <Tooltip title="Lançar baba">
-                      <IconButton
-                        color="primary"
-                        onClick={() => openStatsDialog(player)}
-                        disabled={isToggling}
-                        aria-label={`Lançar gols e assistências de ${player.name}`}
-                      >
-                        <SportsSoccerOutlinedIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Editar jogador">
-                      <IconButton
-                        onClick={() => openEditDialog(player)}
-                        disabled={isToggling}
-                        aria-label={`Editar ${player.name}`}
-                      >
-                        <EditOutlinedIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip
-                      title={
-                        player.isActive
-                          ? "Inativar jogador"
-                          : "Reativar jogador"
-                      }
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      useFlexGap
+                      sx={{ flexWrap: "wrap" }}
                     >
-                      <span>
+                      <Chip
+                        label={getPlayerTypeLabel(player)}
+                        size="small"
+                        color={getPlayerTypeColor(player)}
+                      />
+                      <Chip
+                        label={`${player.goals} gol${player.goals === 1 ? "" : "s"}`}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Chip
+                        label={`${player.assists} assist${
+                          player.assists === 1 ? "" : "s"
+                        }`}
+                        size="small"
+                        variant="outlined"
+                      />
+                      <Chip
+                        label={player.isActive ? "Ativo" : "Inativo"}
+                        size="small"
+                        color={player.isActive ? "success" : "error"}
+                        variant="outlined"
+                      />
+                    </Stack>
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      sx={{ justifyContent: "flex-end" }}
+                    >
+                      <Tooltip title="Lançar baba">
                         <IconButton
-                          color={player.isActive ? "warning" : "success"}
-                          onClick={() => void togglePlayerStatus(player)}
+                          size="small"
+                          color="primary"
+                          onClick={() => openStatsDialog(player)}
                           disabled={isToggling}
-                          aria-label={
-                            player.isActive
-                              ? `Inativar ${player.name}`
-                              : `Reativar ${player.name}`
-                          }
+                          aria-label={`Lançar gols e assistências de ${player.name}`}
                         >
-                          {isToggling ? (
-                            <CircularProgress size={20} color="inherit" />
-                          ) : player.isActive ? (
-                            <PauseCircleOutlineOutlinedIcon />
-                          ) : (
-                            <PlayCircleOutlineOutlinedIcon />
-                          )}
+                          <SportsSoccerOutlinedIcon fontSize="small" />
                         </IconButton>
-                      </span>
-                    </Tooltip>
+                      </Tooltip>
+                      <Tooltip title="Editar jogador">
+                        <IconButton
+                          size="small"
+                          onClick={() => openEditDialog(player)}
+                          disabled={isToggling}
+                          aria-label={`Editar ${player.name}`}
+                        >
+                          <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip
+                        title={
+                          player.isActive
+                            ? "Inativar jogador"
+                            : "Reativar jogador"
+                        }
+                      >
+                        <span>
+                          <IconButton
+                            size="small"
+                            color={player.isActive ? "warning" : "success"}
+                            onClick={() => void togglePlayerStatus(player)}
+                            disabled={isToggling}
+                            aria-label={
+                              player.isActive
+                                ? `Inativar ${player.name}`
+                                : `Reativar ${player.name}`
+                            }
+                          >
+                            {isToggling ? (
+                              <CircularProgress size={18} color="inherit" />
+                            ) : player.isActive ? (
+                              <PauseCircleOutlineOutlinedIcon fontSize="small" />
+                            ) : (
+                              <PlayCircleOutlineOutlinedIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Stack>
                   </Stack>
                 );
               })}
