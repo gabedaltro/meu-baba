@@ -30,7 +30,6 @@ import {
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useAuth } from "../features/auth/authContext";
 import {
   fetchPlayerRankings,
   type RankingFilters,
@@ -387,8 +386,6 @@ export function RankingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const { isAuthenticated, isSessionLoading } = useAuth();
-  const canFilterByDate = isAuthenticated && !isSessionLoading;
   const [entries, setEntries] = useState<RankingPlayer[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -403,18 +400,13 @@ export function RankingsPage() {
     () => ({
       metric,
       status: getStatusFromParams(searchParams.get("status")),
-      type: isCapasMetric
-        ? "MEMBER"
-        : getTypeFromParams(searchParams.get("type")),
+      type: isCapasMetric ? null : getTypeFromParams(searchParams.get("type")),
+      excludeGuests: isCapasMetric,
       search: searchParams.get("search")?.trim() || null,
-      startDate: canFilterByDate
-        ? getDateFromParams(searchParams.get("startDate"))
-        : null,
-      endDate: canFilterByDate
-        ? getDateFromParams(searchParams.get("endDate"))
-        : null,
+      startDate: getDateFromParams(searchParams.get("startDate")),
+      endDate: getDateFromParams(searchParams.get("endDate")),
     }),
-    [searchParams, canFilterByDate, metric, isCapasMetric],
+    [searchParams, metric, isCapasMetric],
   );
 
   const updateFilter = (
@@ -639,9 +631,7 @@ export function RankingsPage() {
               gridTemplateColumns: {
                 xs: "1fr",
                 sm: "repeat(2, minmax(120px, 1fr))",
-                md: canFilterByDate
-                  ? `2fr repeat(${isCapasMetric ? 3 : 4}, minmax(120px, 1fr))`
-                  : `2fr repeat(${isCapasMetric ? 1 : 2}, minmax(120px, 1fr))`,
+                md: `2fr repeat(${isCapasMetric ? 3 : 4}, minmax(120px, 1fr))`,
               },
               gap: 1.5,
             }}
@@ -690,28 +680,20 @@ export function RankingsPage() {
               <MenuItem value="ALL">Todos</MenuItem>
               <MenuItem value="INACTIVE">Inativos</MenuItem>
             </Select>
-            {canFilterByDate ? (
-              <>
-                <TextField
-                  label="De"
-                  type="date"
-                  value={filters.startDate ?? ""}
-                  onChange={(event) =>
-                    updateFilter("startDate", event.target.value)
-                  }
-                  slotProps={{ inputLabel: { shrink: true } }}
-                />
-                <TextField
-                  label="Até"
-                  type="date"
-                  value={filters.endDate ?? ""}
-                  onChange={(event) =>
-                    updateFilter("endDate", event.target.value)
-                  }
-                  slotProps={{ inputLabel: { shrink: true } }}
-                />
-              </>
-            ) : null}
+            <TextField
+              label="De"
+              type="date"
+              value={filters.startDate ?? ""}
+              onChange={(event) => updateFilter("startDate", event.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+            <TextField
+              label="Até"
+              type="date"
+              value={filters.endDate ?? ""}
+              onChange={(event) => updateFilter("endDate", event.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
           </Box>
         </AccordionDetails>
       </Accordion>

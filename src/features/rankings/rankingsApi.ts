@@ -8,6 +8,7 @@ export type RankingFilters = {
   metric: RankingMetric
   status: RankingStatus
   type?: PlayerType | null
+  excludeGuests?: boolean
   search?: string | null
   startDate?: string | null
   endDate?: string | null
@@ -39,6 +40,7 @@ export type RankingResponse = {
     offset: number
     status: RankingStatus
     type: PlayerType | null
+    excludeGuests?: boolean
     search: string | null
     startDate: string | null
     endDate: string | null
@@ -53,6 +55,7 @@ export async function fetchPlayerRankings(filters: RankingFilters) {
       metric: filters.metric,
       status: filters.status,
       type: filters.type || undefined,
+      excludeGuests: filters.excludeGuests || undefined,
       search: filters.search || undefined,
       startDate: filters.startDate || undefined,
       endDate: filters.endDate || undefined,
