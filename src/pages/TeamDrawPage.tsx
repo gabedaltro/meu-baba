@@ -257,7 +257,6 @@ async function copyTextToClipboard(text: string) {
 export function TeamDrawPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const canEdit = isAuthenticated;
   const [storedDrawState] = useState(() => loadStoredDrawState());
   const [participants, setParticipants] = useState<DrawParticipant[]>([]);
   const [maxPlayersPerTeam, setMaxPlayersPerTeam] = useState(
@@ -347,10 +346,6 @@ export function TeamDrawPage() {
   }, [maxPlayersPerTeam]);
 
   const addParticipant = (playerIds: string[]) => {
-    if (!canEdit) {
-      return 0;
-    }
-
     const participantIds = new Set(
       participants.map((participant) => String(participant.id)),
     );
@@ -383,10 +378,6 @@ export function TeamDrawPage() {
   };
 
   const addAllMonthlyPlayers = () => {
-    if (!canEdit) {
-      return;
-    }
-
     const participantIds = new Set(
       participants.map((participant) => String(participant.id)),
     );
@@ -415,10 +406,6 @@ export function TeamDrawPage() {
   };
 
   const importGoalkeepers = (selectedPlayers: DrawParticipant[]) => {
-    if (!canEdit) {
-      return;
-    }
-
     const existingIds = new Set(
       participants.map((participant) => String(participant.id)),
     );
@@ -448,10 +435,6 @@ export function TeamDrawPage() {
     selectedPlayers: DrawParticipant[],
     typedGuests: ImportedGuest[],
   ) => {
-    if (!canEdit) {
-      return;
-    }
-
     const existingIds = new Set(
       participants.map((participant) => String(participant.id)),
     );
@@ -502,10 +485,6 @@ export function TeamDrawPage() {
   };
 
   const toggleLateArrival = (participantId: string) => {
-    if (!canEdit) {
-      return;
-    }
-
     setParticipants((currentParticipants) =>
       currentParticipants.map((participant) =>
         String(participant.id) === participantId
@@ -518,10 +497,6 @@ export function TeamDrawPage() {
   };
 
   const removeParticipant = (participantId: string) => {
-    if (!canEdit) {
-      return;
-    }
-
     setParticipants((currentParticipants) =>
       currentParticipants.filter(
         (participant) => String(participant.id) !== participantId,
@@ -532,20 +507,12 @@ export function TeamDrawPage() {
   };
 
   const clearParticipants = () => {
-    if (!canEdit) {
-      return;
-    }
-
     setParticipants([]);
     setTeams([]);
     setIsDrawModalOpen(false);
   };
 
   const runDraw = async () => {
-    if (!canEdit) {
-      return;
-    }
-
     if (participants.length === 0) {
       setSnackbarMessage("Adicione pelo menos um jogador antes de sortear.");
       return;
@@ -686,10 +653,6 @@ export function TeamDrawPage() {
     stat: "goals" | "assists",
     delta: number,
   ) => {
-    if (!canEdit) {
-      return;
-    }
-
     const updatePlayer = (player: DrawParticipant): DrawParticipant =>
       String(player.id) === participantId
         ? {
@@ -710,10 +673,7 @@ export function TeamDrawPage() {
   };
 
   return (
-    <Stack
-      spacing={{ xs: 2.5, md: 4 }}
-      sx={{ pb: { xs: canEdit || teams.length > 0 ? 11 : 2, lg: 2 } }}
-    >
+    <Stack spacing={{ xs: 2.5, md: 4 }} sx={{ pb: { xs: 11, lg: 2 } }}>
       <Paper
         component={motion.header}
         initial={{ opacity: 0, y: -12 }}
@@ -787,7 +747,6 @@ export function TeamDrawPage() {
             participants={displayParticipants}
             availablePlayers={registeredPlayers}
             isLoadingPlayers={registeredPlayers.length === 0}
-            canEdit={canEdit}
             onAdd={addParticipant}
             onAddMonthlyPlayers={addAllMonthlyPlayers}
             onOpenGoalkeeperImport={() => setIsGoalkeeperDialogOpen(true)}
@@ -814,9 +773,7 @@ export function TeamDrawPage() {
                 sx={{ alignItems: "center", justifyContent: "space-between" }}
               >
                 <Box>
-                  <Typography variant="h3">
-                    {canEdit ? "Pronto para sortear" : "Times da semana"}
-                  </Typography>
+                  <Typography variant="h3">Pronto para sortear</Typography>
                   <Typography variant="body2" color="text.secondary">
                     {summary.goalkeepers} goleiro
                     {summary.goalkeepers === 1 ? "" : "s"} na lista
@@ -829,13 +786,10 @@ export function TeamDrawPage() {
                   <ShuffleOutlinedIcon />
                 </Avatar>
               </Stack>
-              {canEdit ? (
-                <DrawConfigCard
-                  maxPlayersPerTeam={maxPlayersPerTeam}
-                  onMaxPlayersPerTeamChange={setMaxPlayersPerTeam}
-                  canEdit={canEdit}
-                />
-              ) : null}
+              <DrawConfigCard
+                maxPlayersPerTeam={maxPlayersPerTeam}
+                onMaxPlayersPerTeamChange={setMaxPlayersPerTeam}
+              />
               {teams.length > 0 ? (
                 <Button
                   variant="outlined"
@@ -845,24 +799,22 @@ export function TeamDrawPage() {
                   Ver confronto
                 </Button>
               ) : null}
-              {canEdit ? (
-                <Button
-                  variant="contained"
-                  size="large"
-                  startIcon={
-                    isDrawing ? (
-                      <CircularProgress color="inherit" size={18} />
-                    ) : (
-                      <ShuffleOutlinedIcon />
-                    )
-                  }
-                  onClick={runDraw}
-                  disabled={isDrawing || participants.length === 0}
-                  sx={{ display: { xs: "none", lg: "inline-flex" } }}
-                >
-                  {isDrawing ? "Sorteando..." : "Sortear agora"}
-                </Button>
-              ) : null}
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={
+                  isDrawing ? (
+                    <CircularProgress color="inherit" size={18} />
+                  ) : (
+                    <ShuffleOutlinedIcon />
+                  )
+                }
+                onClick={runDraw}
+                disabled={isDrawing || participants.length === 0}
+                sx={{ display: { xs: "none", lg: "inline-flex" } }}
+              >
+                {isDrawing ? "Sorteando..." : "Sortear agora"}
+              </Button>
             </Stack>
           </Paper>
         </Grid>
@@ -889,7 +841,6 @@ export function TeamDrawPage() {
           <Box sx={{ position: "relative", zIndex: 1 }}>
             <DrawResultCard
               teams={displayTeams}
-              canEdit={canEdit}
               onRedraw={runDraw}
               onCopy={copyTeams}
               onShare={shareTeams}
@@ -972,55 +923,51 @@ export function TeamDrawPage() {
         </DialogActions>
       </Dialog>
 
-      {canEdit || teams.length > 0 ? (
-        <Box
-          sx={{
-            display: { xs: "block", lg: "none" },
-            position: "fixed",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: (theme) => theme.zIndex.appBar,
-            bgcolor: "rgba(255,255,255,0.96)",
-            backdropFilter: "blur(10px)",
-            borderTop: "1px solid rgba(31,122,77,0.16)",
-            p: 1.5,
-            pb: "max(12px, env(safe-area-inset-bottom))",
-          }}
-        >
-          <Stack spacing={1}>
-            {teams.length > 0 ? (
-              <Button
-                variant="outlined"
-                onClick={() => setIsDrawModalOpen(true)}
-                fullWidth
-              >
-                Ver confronto
-              </Button>
-            ) : null}
-            {canEdit ? (
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={
-                  isDrawing ? (
-                    <CircularProgress color="inherit" size={18} />
-                  ) : (
-                    <ShuffleOutlinedIcon />
-                  )
-                }
-                onClick={runDraw}
-                disabled={isDrawing || participants.length === 0}
-                fullWidth
-              >
-                {isDrawing
-                  ? "Sorteando..."
-                  : `Sortear ${participants.length} jogadores`}
-              </Button>
-            ) : null}
-          </Stack>
-        </Box>
-      ) : null}
+      <Box
+        sx={{
+          display: { xs: "block", lg: "none" },
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: (theme) => theme.zIndex.appBar,
+          bgcolor: "rgba(255,255,255,0.96)",
+          backdropFilter: "blur(10px)",
+          borderTop: "1px solid rgba(31,122,77,0.16)",
+          p: 1.5,
+          pb: "max(12px, env(safe-area-inset-bottom))",
+        }}
+      >
+        <Stack spacing={1}>
+          {teams.length > 0 ? (
+            <Button
+              variant="outlined"
+              onClick={() => setIsDrawModalOpen(true)}
+              fullWidth
+            >
+              Ver confronto
+            </Button>
+          ) : null}
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={
+              isDrawing ? (
+                <CircularProgress color="inherit" size={18} />
+              ) : (
+                <ShuffleOutlinedIcon />
+              )
+            }
+            onClick={runDraw}
+            disabled={isDrawing || participants.length === 0}
+            fullWidth
+          >
+            {isDrawing
+              ? "Sorteando..."
+              : `Sortear ${participants.length} jogadores`}
+          </Button>
+        </Stack>
+      </Box>
 
       <Snackbar
         open={Boolean(snackbarMessage)}
