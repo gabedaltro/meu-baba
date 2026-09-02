@@ -15,6 +15,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { useAuth } from "../features/auth/authContext";
+import { ConfrontoDetailPage } from "../pages/ConfrontoDetailPage";
 import { LoginPage } from "../pages/LoginPage";
 import { MatchDayCreatePage } from "../pages/MatchDayCreatePage";
 import { MatchDayDetailPage } from "../pages/MatchDayDetailPage";
@@ -180,6 +181,14 @@ export function AppRoutes() {
         element={
           <PublicPage>
             <MatchDayDetailPage />
+          </PublicPage>
+        }
+      />
+      <Route
+        path="/rodadas/:matchDayId/confrontos/:confrontoId"
+        element={
+          <PublicPage>
+            <ConfrontoDetailPage />
           </PublicPage>
         }
       />

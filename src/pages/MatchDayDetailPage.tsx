@@ -1,19 +1,15 @@
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
 import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
+import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import HourglassEmptyOutlinedIcon from "@mui/icons-material/HourglassEmptyOutlined";
 import MilitaryTechOutlinedIcon from "@mui/icons-material/MilitaryTechOutlined";
-import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
-import RemoveOutlinedIcon from "@mui/icons-material/RemoveOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import ShuffleOutlinedIcon from "@mui/icons-material/ShuffleOutlined";
-import SportsSoccerOutlinedIcon from "@mui/icons-material/SportsSoccerOutlined";
-import SwapHorizOutlinedIcon from "@mui/icons-material/SwapHorizOutlined";
-import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
 import {
   Alert,
   Avatar,
@@ -25,7 +21,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   IconButton,
   MenuItem,
   Paper,
@@ -43,27 +38,18 @@ import { useAuth } from "../features/auth/authContext";
 import { formatMatchDayDate } from "../features/matchDays/format";
 import {
   createConfronto,
-  createConfrontoSubstitution,
   deleteConfronto,
-  deleteConfrontoSubstitution,
   deleteMatchDay,
   fetchMatchDay,
   renameMatchDayTeam,
-  setConfrontoPlayerStats,
   setMatchDayCapa,
   updateConfronto,
   type ConfrontoScoreSource,
-  type ConfrontoSubstitution,
   type MatchDayConfronto,
   type MatchDayDetail,
   type MatchDayPlayer,
   type MatchDayTeam,
 } from "../features/matchDays/matchDaysApi";
-import {
-  fetchTeamDrawPlayers,
-  mapApiPlayerToDrawParticipant,
-} from "../features/teamDraw/services/usersApi";
-import type { DrawParticipant } from "../features/teamDraw/types";
 
 type ConfrontoFormState = {
   teamAId: string;
@@ -79,8 +65,6 @@ const emptyConfrontoForm: ConfrontoFormState = {
   scoreB: "0",
 };
 
-type StatsFormEntry = { goals: number; ownGoals: number; assists: number };
-
 type SnackbarState = {
   open: boolean;
   message: string;
@@ -91,65 +75,6 @@ function getPlayerLabel(player: MatchDayPlayer) {
   return player.nickname ? `${player.name} (${player.nickname})` : player.name;
 }
 
-function getPlayerShortLabel(player: MatchDayPlayer) {
-  return player.nickname || player.name;
-}
-
-function StatStepper({
-  label,
-  value,
-  onIncrement,
-  onDecrement,
-  disabled,
-}: {
-  label: string;
-  value: number;
-  onIncrement: () => void;
-  onDecrement: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <Stack
-      direction="row"
-      spacing={0.25}
-      sx={{
-        alignItems: "center",
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
-        pl: 1,
-        bgcolor: "#fff",
-      }}
-    >
-      <Typography
-        variant="caption"
-        sx={{ fontWeight: 800, color: "text.secondary", minWidth: 40 }}
-      >
-        {label}
-      </Typography>
-      <IconButton
-        size="small"
-        onClick={onDecrement}
-        disabled={disabled || value <= 0}
-        aria-label={`Diminuir ${label}`}
-      >
-        <RemoveOutlinedIcon fontSize="small" />
-      </IconButton>
-      <Typography sx={{ width: 18, textAlign: "center", fontWeight: 900 }}>
-        {value}
-      </Typography>
-      <IconButton
-        size="small"
-        onClick={onIncrement}
-        disabled={disabled}
-        aria-label={`Aumentar ${label}`}
-      >
-        <AddOutlinedIcon fontSize="small" />
-      </IconButton>
-    </Stack>
-  );
-}
-
 function putGoalkeepersFirst(players: MatchDayPlayer[]) {
   return [...players].sort((a, b) => {
     const aIsGoalkeeper = a.position === "GOALKEEPER" ? 0 : 1;
@@ -157,85 +82,6 @@ function putGoalkeepersFirst(players: MatchDayPlayer[]) {
 
     return aIsGoalkeeper - bIsGoalkeeper;
   });
-}
-
-type ConfrontoRosterPlayer = MatchDayPlayer & { isSubstitute: boolean };
-
-function applySubstitutions(
-  team: MatchDayTeam | undefined,
-  substitutions: ConfrontoSubstitution[],
-): ConfrontoRosterPlayer[] {
-  const substitutionsByOutId = new Map(
-    substitutions.map((substitution) => [
-      substitution.outTeamPlayerId,
-      substitution,
-    ]),
-  );
-
-  return (team?.players ?? []).map((player) => {
-    const substitution = substitutionsByOutId.get(player.teamPlayerId);
-
-    if (!substitution) {
-      return { ...player, isSubstitute: false };
-    }
-
-    return {
-      id: substitution.id,
-      teamPlayerId: substitution.id,
-      playerId: substitution.inPlayer.playerId,
-      name: substitution.inPlayer.name,
-      nickname: substitution.inPlayer.nickname,
-      jerseyNumber: substitution.inPlayer.jerseyNumber,
-      photoUrl: substitution.inPlayer.photoUrl,
-      position: substitution.inPlayer.position,
-      type: substitution.inPlayer.type,
-      isSubstitute: true,
-    };
-  });
-}
-
-function getEligibleTeamPlayers(
-  team: MatchDayTeam | undefined,
-  substitutions: ConfrontoSubstitution[],
-) {
-  const eligible = applySubstitutions(team, substitutions).filter(
-    (player): player is ConfrontoRosterPlayer & { playerId: string } =>
-      player.playerId !== null,
-  );
-
-  return putGoalkeepersFirst(eligible) as (ConfrontoRosterPlayer & {
-    playerId: string;
-  })[];
-}
-
-function getConfrontoEligibleTeams(
-  confronto: Pick<MatchDayConfronto, "teamAId" | "teamBId" | "substitutions">,
-  teamsById: Map<string, MatchDayTeam>,
-) {
-  const teamA = teamsById.get(confronto.teamAId);
-  const teamB = teamsById.get(confronto.teamBId);
-
-  return [
-    {
-      teamId: confronto.teamAId,
-      teamName: teamA?.name ?? "Time A",
-      players: getEligibleTeamPlayers(teamA, confronto.substitutions),
-    },
-    {
-      teamId: confronto.teamBId,
-      teamName: teamB?.name ?? "Time B",
-      players: getEligibleTeamPlayers(teamB, confronto.substitutions),
-    },
-  ];
-}
-
-function getConfrontoEligiblePlayers(
-  confronto: Pick<MatchDayConfronto, "teamAId" | "teamBId" | "substitutions">,
-  teamsById: Map<string, MatchDayTeam>,
-) {
-  return getConfrontoEligibleTeams(confronto, teamsById).flatMap(
-    (group) => group.players,
-  );
 }
 
 function TeamRosterCard({
@@ -391,20 +237,18 @@ function ConfrontoRow({
   teamBName,
   canManage,
   isDeleting,
+  onOpen,
   onEdit,
   onDelete,
-  onManageStats,
-  onManageSubstitutions,
 }: {
   confronto: MatchDayConfronto;
   teamAName: string;
   teamBName: string;
   canManage: boolean;
   isDeleting: boolean;
+  onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onManageStats: () => void;
-  onManageSubstitutions: () => void;
 }) {
   const winner =
     confronto.scoreA === confronto.scoreB
@@ -426,13 +270,23 @@ function ConfrontoRow({
         bgcolor: "#f7faf8",
       }}
     >
-      <Chip label={`#${confronto.sequence}`} size="small" />
-      <Stack sx={{ flex: 1, minWidth: 0 }}>
+      <Box
+        onClick={onOpen}
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 1.25,
+          cursor: "pointer",
+        }}
+      >
+        <Chip label={`#${confronto.sequence}`} size="small" />
         <Stack
           direction="row"
           spacing={1}
           useFlexGap
-          sx={{ alignItems: "center", flexWrap: "wrap" }}
+          sx={{ flex: 1, minWidth: 0, alignItems: "center", flexWrap: "wrap" }}
         >
           <Typography
             sx={{ fontWeight: winner === "A" ? 900 : 600 }}
@@ -453,19 +307,13 @@ function ConfrontoRow({
             {teamBName}
           </Typography>
         </Stack>
-      </Stack>
-      <Tooltip title="Gols e assistências">
-        <IconButton size="small" color="primary" onClick={onManageStats}>
-          <SportsSoccerOutlinedIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
+        <ChevronRightOutlinedIcon
+          fontSize="small"
+          sx={{ color: "text.secondary", flexShrink: 0 }}
+        />
+      </Box>
       {canManage ? (
         <>
-          <Tooltip title="Substituições">
-            <IconButton size="small" onClick={onManageSubstitutions}>
-              <SwapHorizOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
           <Tooltip title="Editar confronto">
             <span>
               <IconButton size="small" onClick={onEdit} disabled={isDeleting}>
@@ -524,35 +372,6 @@ export function MatchDayDetailPage() {
   const [deletingConfrontoId, setDeletingConfrontoId] = useState<
     string | null
   >(null);
-
-  const [statsConfronto, setStatsConfronto] =
-    useState<MatchDayConfronto | null>(null);
-  const [statsForm, setStatsForm] = useState<
-    Record<string, StatsFormEntry>
-  >({});
-  const [isSavingStats, setIsSavingStats] = useState(false);
-  const [statsErrorMessage, setStatsErrorMessage] = useState("");
-
-  const [substitutionConfronto, setSubstitutionConfronto] =
-    useState<MatchDayConfronto | null>(null);
-  const [substitutingOutTeamPlayerId, setSubstitutingOutTeamPlayerId] =
-    useState<string | null>(null);
-  const [substituteSelectedPlayerId, setSubstituteSelectedPlayerId] =
-    useState("");
-  const [substituteGuestName, setSubstituteGuestName] = useState("");
-  const [isSavingSubstitution, setIsSavingSubstitution] = useState(false);
-  const [substitutionErrorMessage, setSubstitutionErrorMessage] =
-    useState("");
-  const [removingSubstitutionId, setRemovingSubstitutionId] = useState<
-    string | null
-  >(null);
-  const [registeredPlayers, setRegisteredPlayers] = useState<
-    DrawParticipant[]
-  >([]);
-  const [isLoadingRegisteredPlayers, setIsLoadingRegisteredPlayers] =
-    useState(false);
-  const [hasLoadedRegisteredPlayers, setHasLoadedRegisteredPlayers] =
-    useState(false);
 
   const [isSavingCapa, setIsSavingCapa] = useState(false);
   const [capaSelection, setCapaSelection] = useState("");
@@ -622,28 +441,6 @@ export function MatchDayDetailPage() {
         (a, b) => a.sequence - b.sequence,
       ),
     [matchDay],
-  );
-
-  const rosterPlayerIds = useMemo(() => {
-    const ids = new Set<string>();
-
-    (matchDay?.teams ?? []).forEach((team) => {
-      team.players.forEach((player) => {
-        if (player.playerId) {
-          ids.add(player.playerId);
-        }
-      });
-    });
-
-    return ids;
-  }, [matchDay]);
-
-  const availableSubstitutePlayers = useMemo(
-    () =>
-      registeredPlayers.filter(
-        (player) => !rosterPlayerIds.has(String(player.id)),
-      ),
-    [registeredPlayers, rosterPlayerIds],
   );
 
   const capaTeam = matchDay?.capaTeamId
@@ -768,224 +565,6 @@ export function MatchDayDetailPage() {
     }
   };
 
-  const openStatsDialog = (confronto: MatchDayConfronto) => {
-    const eligiblePlayers = getConfrontoEligiblePlayers(confronto, teamsById);
-    const initialForm: Record<string, StatsFormEntry> = {};
-
-    eligiblePlayers.forEach((player) => {
-      const existing = confronto.playerStats.find(
-        (stat) => stat.playerId === player.playerId,
-      );
-
-      initialForm[player.playerId] = {
-        goals: existing?.goals ?? 0,
-        ownGoals: existing?.ownGoals ?? 0,
-        assists: existing?.assists ?? 0,
-      };
-    });
-
-    setStatsForm(initialForm);
-    setStatsConfronto(confronto);
-    setStatsErrorMessage("");
-  };
-
-  const closeStatsDialog = () => {
-    if (isSavingStats) {
-      return;
-    }
-
-    setStatsConfronto(null);
-    setStatsForm({});
-    setStatsErrorMessage("");
-  };
-
-  const emptyStatsEntry: StatsFormEntry = { goals: 0, ownGoals: 0, assists: 0 };
-
-  const changeStatsField = (
-    playerId: string,
-    field: keyof StatsFormEntry,
-    delta: number,
-  ) => {
-    setStatsForm((current) => {
-      const entry = current[playerId] ?? emptyStatsEntry;
-      const nextValue = Math.max(0, entry[field] + delta);
-
-      return { ...current, [playerId]: { ...entry, [field]: nextValue } };
-    });
-  };
-
-  const submitStats = async () => {
-    if (!statsConfronto) {
-      return;
-    }
-
-    const eligiblePlayers = getConfrontoEligiblePlayers(
-      statsConfronto,
-      teamsById,
-    );
-    const entries = eligiblePlayers.map((player) => {
-      const values = statsForm[player.playerId] ?? emptyStatsEntry;
-
-      return {
-        playerId: player.playerId,
-        goals: values.goals,
-        ownGoals: values.ownGoals,
-        assists: values.assists,
-      };
-    });
-
-    setIsSavingStats(true);
-    setStatsErrorMessage("");
-
-    try {
-      await setConfrontoPlayerStats(statsConfronto.id, entries);
-      showSnackbar("Estatísticas do confronto atualizadas.");
-      setStatsConfronto(null);
-      setStatsForm({});
-      await refreshMatchDay();
-    } catch {
-      setStatsErrorMessage("Não foi possível salvar as estatísticas.");
-    } finally {
-      setIsSavingStats(false);
-    }
-  };
-
-  const ensureRegisteredPlayersLoaded = () => {
-    if (hasLoadedRegisteredPlayers || isLoadingRegisteredPlayers) {
-      return;
-    }
-
-    setIsLoadingRegisteredPlayers(true);
-
-    fetchTeamDrawPlayers()
-      .then((players) => {
-        setRegisteredPlayers(players.map(mapApiPlayerToDrawParticipant));
-        setHasLoadedRegisteredPlayers(true);
-      })
-      .catch(() => {
-        showSnackbar("Não foi possível carregar os jogadores cadastrados.", "error");
-      })
-      .finally(() => {
-        setIsLoadingRegisteredPlayers(false);
-      });
-  };
-
-  const openSubstitutionDialog = (confronto: MatchDayConfronto) => {
-    setSubstitutionConfronto(confronto);
-    setSubstitutingOutTeamPlayerId(null);
-    setSubstituteSelectedPlayerId("");
-    setSubstituteGuestName("");
-    setSubstitutionErrorMessage("");
-    ensureRegisteredPlayersLoaded();
-  };
-
-  const closeSubstitutionDialog = () => {
-    if (isSavingSubstitution || removingSubstitutionId) {
-      return;
-    }
-
-    setSubstitutionConfronto(null);
-    setSubstitutingOutTeamPlayerId(null);
-    setSubstituteSelectedPlayerId("");
-    setSubstituteGuestName("");
-    setSubstitutionErrorMessage("");
-  };
-
-  const startSubstitution = (teamPlayerId: string) => {
-    setSubstitutingOutTeamPlayerId(teamPlayerId);
-    setSubstituteSelectedPlayerId("");
-    setSubstituteGuestName("");
-    setSubstitutionErrorMessage("");
-  };
-
-  const cancelSubstitution = () => {
-    setSubstitutingOutTeamPlayerId(null);
-    setSubstituteSelectedPlayerId("");
-    setSubstituteGuestName("");
-    setSubstitutionErrorMessage("");
-  };
-
-  const submitSubstitution = async () => {
-    if (!substitutionConfronto || !substitutingOutTeamPlayerId) {
-      return;
-    }
-
-    const trimmedGuestName = substituteGuestName.trim();
-
-    if (!substituteSelectedPlayerId && !trimmedGuestName) {
-      setSubstitutionErrorMessage(
-        "Selecione um jogador cadastrado ou digite um nome.",
-      );
-      return;
-    }
-
-    setIsSavingSubstitution(true);
-    setSubstitutionErrorMessage("");
-
-    try {
-      await createConfrontoSubstitution(substitutionConfronto.id, {
-        outTeamPlayerId: substitutingOutTeamPlayerId,
-        in: substituteSelectedPlayerId
-          ? { playerId: substituteSelectedPlayerId }
-          : { name: trimmedGuestName, type: "GUEST" },
-      });
-      showSnackbar("Substituição registrada.");
-      setSubstitutingOutTeamPlayerId(null);
-      setSubstituteSelectedPlayerId("");
-      setSubstituteGuestName("");
-
-      const refreshed = await refreshMatchDay();
-      const updatedConfronto = refreshed?.confrontos.find(
-        (confronto) => confronto.id === substitutionConfronto.id,
-      );
-
-      if (updatedConfronto) {
-        setSubstitutionConfronto(updatedConfronto);
-      }
-    } catch {
-      setSubstitutionErrorMessage("Não foi possível registrar a substituição.");
-    } finally {
-      setIsSavingSubstitution(false);
-    }
-  };
-
-  const removeSubstitution = async (substitution: ConfrontoSubstitution) => {
-    if (!substitutionConfronto) {
-      return;
-    }
-
-    if (
-      !window.confirm(
-        "Desfazer esta substituição? O gol/assistência do substituto nesse confronto será removido.",
-      )
-    ) {
-      return;
-    }
-
-    setRemovingSubstitutionId(substitution.id);
-
-    try {
-      await deleteConfrontoSubstitution(
-        substitutionConfronto.id,
-        substitution.id,
-      );
-      showSnackbar("Substituição desfeita.");
-
-      const refreshed = await refreshMatchDay();
-      const updatedConfronto = refreshed?.confrontos.find(
-        (confronto) => confronto.id === substitutionConfronto.id,
-      );
-
-      if (updatedConfronto) {
-        setSubstitutionConfronto(updatedConfronto);
-      }
-    } catch {
-      showSnackbar("Não foi possível desfazer a substituição.", "error");
-    } finally {
-      setRemovingSubstitutionId(null);
-    }
-  };
-
   const startEditingTeamName = (team: MatchDayTeam) => {
     setEditingTeamId(team.id);
     setTeamNameDraft(team.name);
@@ -1096,13 +675,6 @@ export function MatchDayDetailPage() {
       </Stack>
     );
   }
-
-  const eligibleStatsTeams = statsConfronto
-    ? getConfrontoEligibleTeams(statsConfronto, teamsById)
-    : [];
-  const eligibleStatsPlayers = eligibleStatsTeams.flatMap(
-    (group) => group.players,
-  );
 
   return (
     <Stack spacing={{ xs: 2.5, md: 4 }} sx={{ pb: 4 }}>
@@ -1317,10 +889,13 @@ export function MatchDayDetailPage() {
                   teamBName={teamsById.get(confronto.teamBId)?.name ?? "Time"}
                   canManage={isAuthenticated}
                   isDeleting={deletingConfrontoId === confronto.id}
+                  onOpen={() =>
+                    navigate(
+                      `/rodadas/${matchDayId}/confrontos/${confronto.id}`,
+                    )
+                  }
                   onEdit={() => openEditConfrontoDialog(confronto)}
                   onDelete={() => void removeConfronto(confronto)}
-                  onManageStats={() => openStatsDialog(confronto)}
-                  onManageSubstitutions={() => openSubstitutionDialog(confronto)}
                 />
               ))}
             </Stack>
@@ -1414,7 +989,7 @@ export function MatchDayDetailPage() {
             ) : (
               <Alert severity="info">
                 O placar é calculado automaticamente a partir dos gols
-                lançados em "Gols e assistências".
+                lançados na tela do confronto.
               </Alert>
             )}
           </Stack>
@@ -1438,382 +1013,6 @@ export function MatchDayDetailPage() {
             }
           >
             {editingConfrontoId ? "Salvar" : "Adicionar"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(statsConfronto)}
-        onClose={closeStatsDialog}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Gols e assistências do confronto</DialogTitle>
-        <DialogContent>
-          {statsConfronto ? (
-            <Stack spacing={2} sx={{ pt: 1 }}>
-              {statsErrorMessage ? (
-                <Alert severity="error">{statsErrorMessage}</Alert>
-              ) : null}
-              {eligibleStatsPlayers.length === 0 ? (
-                <Typography color="text.secondary">
-                  Nenhum jogador cadastrado nesses times para lançar
-                  estatísticas. Convidados avulsos não podem ser creditados.
-                </Typography>
-              ) : (
-                <Stack spacing={2.5} sx={{ maxHeight: 420, overflowY: "auto", pr: 0.5 }}>
-                  {eligibleStatsTeams.map((group) => (
-                    <Stack key={group.teamId} spacing={1}>
-                      <Typography
-                        variant="overline"
-                        sx={{
-                          fontWeight: 800,
-                          color: "primary.main",
-                          lineHeight: 1.2,
-                        }}
-                      >
-                        {group.teamName}
-                      </Typography>
-                      {group.players.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary">
-                          Nenhum jogador cadastrado neste time.
-                        </Typography>
-                      ) : (
-                        <Stack spacing={1}>
-                          {group.players.map((player) => {
-                            const entry =
-                              statsForm[player.playerId] ?? emptyStatsEntry;
-
-                            return (
-                              <Stack
-                                key={player.playerId}
-                                spacing={1}
-                                sx={{
-                                  border: "1px solid",
-                                  borderColor: "divider",
-                                  borderRadius: 2,
-                                  p: 1,
-                                  bgcolor: "#f7faf8",
-                                }}
-                              >
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  sx={{ alignItems: "center" }}
-                                >
-                                  <Avatar
-                                    src={player.photoUrl ?? undefined}
-                                    alt={player.name}
-                                    sx={{ width: 30, height: 30, fontSize: 12 }}
-                                  >
-                                    {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
-                                  </Avatar>
-                                  <Typography
-                                    sx={{ flex: 1, fontWeight: 800, minWidth: 0 }}
-                                    noWrap
-                                  >
-                                    {getPlayerShortLabel(player)}
-                                  </Typography>
-                                  {player.position === "GOALKEEPER" ? (
-                                    <Chip
-                                      label="Goleiro"
-                                      size="small"
-                                      color="primary"
-                                      variant="outlined"
-                                      sx={{ flexShrink: 0 }}
-                                    />
-                                  ) : null}
-                                  {player.isSubstitute ? (
-                                    <Chip
-                                      label="Substituto"
-                                      size="small"
-                                      color="secondary"
-                                      variant="outlined"
-                                      sx={{ flexShrink: 0 }}
-                                    />
-                                  ) : null}
-                                </Stack>
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  useFlexGap
-                                  sx={{ flexWrap: "wrap" }}
-                                >
-                                  <StatStepper
-                                    label="Gols"
-                                    value={entry.goals}
-                                    disabled={isSavingStats}
-                                    onIncrement={() =>
-                                      changeStatsField(player.playerId, "goals", 1)
-                                    }
-                                    onDecrement={() =>
-                                      changeStatsField(player.playerId, "goals", -1)
-                                    }
-                                  />
-                                  <StatStepper
-                                    label="Contra"
-                                    value={entry.ownGoals}
-                                    disabled={isSavingStats}
-                                    onIncrement={() =>
-                                      changeStatsField(player.playerId, "ownGoals", 1)
-                                    }
-                                    onDecrement={() =>
-                                      changeStatsField(player.playerId, "ownGoals", -1)
-                                    }
-                                  />
-                                  <StatStepper
-                                    label="Assist."
-                                    value={entry.assists}
-                                    disabled={isSavingStats}
-                                    onIncrement={() =>
-                                      changeStatsField(player.playerId, "assists", 1)
-                                    }
-                                    onDecrement={() =>
-                                      changeStatsField(player.playerId, "assists", -1)
-                                    }
-                                  />
-                                </Stack>
-                              </Stack>
-                            );
-                          })}
-                        </Stack>
-                      )}
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-            </Stack>
-          ) : null}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={closeStatsDialog} disabled={isSavingStats}>
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => void submitStats()}
-            disabled={isSavingStats || eligibleStatsPlayers.length === 0}
-            startIcon={
-              isSavingStats ? (
-                <CircularProgress color="inherit" size={18} />
-              ) : (
-                <SaveOutlinedIcon />
-              )
-            }
-          >
-            Salvar estatísticas
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(substitutionConfronto)}
-        onClose={closeSubstitutionDialog}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Substituições do confronto</DialogTitle>
-        <DialogContent>
-          {substitutionConfronto ? (
-            <Stack spacing={2.5} sx={{ pt: 1 }}>
-              <Alert severity="info">
-                Substitua um jogador ausente só nesse confronto. Ele continua
-                normal nos outros confrontos da rodada.
-              </Alert>
-              {substitutionErrorMessage ? (
-                <Alert severity="error">{substitutionErrorMessage}</Alert>
-              ) : null}
-              {[
-                {
-                  teamId: substitutionConfronto.teamAId,
-                  team: teamsById.get(substitutionConfronto.teamAId),
-                },
-                {
-                  teamId: substitutionConfronto.teamBId,
-                  team: teamsById.get(substitutionConfronto.teamBId),
-                },
-              ].map(({ teamId, team }) => (
-                <Stack key={teamId} spacing={1}>
-                  <Typography
-                    variant="overline"
-                    sx={{ fontWeight: 800, color: "primary.main", lineHeight: 1.2 }}
-                  >
-                    {team?.name ?? "Time"}
-                  </Typography>
-                  <Stack spacing={1}>
-                    {(team?.players ?? []).map((player) => {
-                      const substitution = substitutionConfronto.substitutions.find(
-                        (item) => item.outTeamPlayerId === player.teamPlayerId,
-                      );
-                      const isEditingThisPlayer =
-                        substitutingOutTeamPlayerId === player.teamPlayerId;
-
-                      return (
-                        <Stack
-                          key={player.teamPlayerId}
-                          spacing={1}
-                          sx={{
-                            border: "1px solid",
-                            borderColor: "divider",
-                            borderRadius: 2,
-                            p: 1,
-                          }}
-                        >
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            sx={{ alignItems: "center" }}
-                          >
-                            <Avatar
-                              src={player.photoUrl ?? undefined}
-                              alt={player.name}
-                              sx={{ width: 30, height: 30, fontSize: 12 }}
-                            >
-                              {player.name.charAt(0).toLocaleUpperCase("pt-BR")}
-                            </Avatar>
-                            <Typography
-                              sx={{ flex: 1, fontWeight: 800, minWidth: 0 }}
-                              noWrap
-                            >
-                              {getPlayerShortLabel(player)}
-                            </Typography>
-                            {!substitution ? (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                startIcon={<SwapHorizOutlinedIcon />}
-                                onClick={() =>
-                                  isEditingThisPlayer
-                                    ? cancelSubstitution()
-                                    : startSubstitution(player.teamPlayerId)
-                                }
-                              >
-                                {isEditingThisPlayer ? "Cancelar" : "Substituir"}
-                              </Button>
-                            ) : null}
-                          </Stack>
-
-                          {substitution ? (
-                            <Stack
-                              direction="row"
-                              spacing={1}
-                              sx={{
-                                alignItems: "center",
-                                bgcolor: "#f7faf8",
-                                borderRadius: 1.5,
-                                p: 1,
-                              }}
-                            >
-                              <SwapHorizOutlinedIcon
-                                fontSize="small"
-                                color="action"
-                              />
-                              <Typography
-                                variant="body2"
-                                sx={{ flex: 1, fontWeight: 700, minWidth: 0 }}
-                                noWrap
-                              >
-                                {substitution.inPlayer.nickname
-                                  ? substitution.inPlayer.nickname
-                                  : substitution.inPlayer.name}
-                              </Typography>
-                              <Tooltip title="Desfazer substituição">
-                                <span>
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => void removeSubstitution(substitution)}
-                                    disabled={removingSubstitutionId === substitution.id}
-                                  >
-                                    {removingSubstitutionId === substitution.id ? (
-                                      <CircularProgress size={16} color="inherit" />
-                                    ) : (
-                                      <UndoOutlinedIcon fontSize="small" />
-                                    )}
-                                  </IconButton>
-                                </span>
-                              </Tooltip>
-                            </Stack>
-                          ) : null}
-
-                          {isEditingThisPlayer ? (
-                            <Stack spacing={1} sx={{ pt: 0.5 }}>
-                              <Select
-                                displayEmpty
-                                size="small"
-                                value={substituteSelectedPlayerId}
-                                disabled={
-                                  isLoadingRegisteredPlayers ||
-                                  availableSubstitutePlayers.length === 0
-                                }
-                                onChange={(event) => {
-                                  setSubstituteSelectedPlayerId(event.target.value);
-                                  setSubstituteGuestName("");
-                                }}
-                                fullWidth
-                              >
-                                <MenuItem value="">
-                                  {isLoadingRegisteredPlayers
-                                    ? "Carregando jogadores..."
-                                    : availableSubstitutePlayers.length === 0
-                                      ? "Nenhum jogador disponível"
-                                      : "Selecionar jogador cadastrado"}
-                                </MenuItem>
-                                {availableSubstitutePlayers.map((candidate) => (
-                                  <MenuItem key={candidate.id} value={String(candidate.id)}>
-                                    {candidate.nickname
-                                      ? `${candidate.name} (${candidate.nickname})`
-                                      : candidate.name}
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                              <Divider>ou</Divider>
-                              <TextField
-                                label="Nome digitado"
-                                size="small"
-                                value={substituteGuestName}
-                                onChange={(event) => {
-                                  setSubstituteGuestName(event.target.value);
-                                  setSubstituteSelectedPlayerId("");
-                                }}
-                                fullWidth
-                              />
-                              <Button
-                                variant="contained"
-                                size="small"
-                                startIcon={
-                                  isSavingSubstitution ? (
-                                    <CircularProgress color="inherit" size={16} />
-                                  ) : (
-                                    <PersonAddAltOutlinedIcon />
-                                  )
-                                }
-                                onClick={() => void submitSubstitution()}
-                                disabled={
-                                  isSavingSubstitution ||
-                                  (!substituteSelectedPlayerId &&
-                                    !substituteGuestName.trim())
-                                }
-                              >
-                                Confirmar substituição
-                              </Button>
-                            </Stack>
-                          ) : null}
-                        </Stack>
-                      );
-                    })}
-                  </Stack>
-                </Stack>
-              ))}
-            </Stack>
-          ) : null}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button
-            onClick={closeSubstitutionDialog}
-            disabled={isSavingSubstitution || Boolean(removingSubstitutionId)}
-          >
-            Fechar
           </Button>
         </DialogActions>
       </Dialog>
